@@ -34103,6 +34103,17 @@ class $NotificationsTable extends Notifications
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _archivedAtMeta = const VerificationMeta(
+    'archivedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> archivedAt = GeneratedColumn<DateTime>(
+    'archived_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -34117,6 +34128,7 @@ class $NotificationsTable extends Notifications
     body,
     entityId,
     readAt,
+    archivedAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -34215,6 +34227,12 @@ class $NotificationsTable extends Notifications
         readAt.isAcceptableOrUnknown(data['read_at']!, _readAtMeta),
       );
     }
+    if (data.containsKey('archived_at')) {
+      context.handle(
+        _archivedAtMeta,
+        archivedAt.isAcceptableOrUnknown(data['archived_at']!, _archivedAtMeta),
+      );
+    }
     return context;
   }
 
@@ -34272,6 +34290,10 @@ class $NotificationsTable extends Notifications
         DriftSqlType.dateTime,
         data['${effectivePrefix}read_at'],
       ),
+      archivedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}archived_at'],
+      ),
     );
   }
 
@@ -34294,6 +34316,7 @@ class Notification extends DataClass implements Insertable<Notification> {
   final String body;
   final String? entityId;
   final DateTime? readAt;
+  final DateTime? archivedAt;
   const Notification({
     required this.id,
     required this.createdAt,
@@ -34307,6 +34330,7 @@ class Notification extends DataClass implements Insertable<Notification> {
     required this.body,
     this.entityId,
     this.readAt,
+    this.archivedAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -34328,6 +34352,9 @@ class Notification extends DataClass implements Insertable<Notification> {
     }
     if (!nullToAbsent || readAt != null) {
       map['read_at'] = Variable<DateTime>(readAt);
+    }
+    if (!nullToAbsent || archivedAt != null) {
+      map['archived_at'] = Variable<DateTime>(archivedAt);
     }
     return map;
   }
@@ -34352,6 +34379,9 @@ class Notification extends DataClass implements Insertable<Notification> {
       readAt: readAt == null && nullToAbsent
           ? const Value.absent()
           : Value(readAt),
+      archivedAt: archivedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(archivedAt),
     );
   }
 
@@ -34373,6 +34403,7 @@ class Notification extends DataClass implements Insertable<Notification> {
       body: serializer.fromJson<String>(json['body']),
       entityId: serializer.fromJson<String?>(json['entityId']),
       readAt: serializer.fromJson<DateTime?>(json['readAt']),
+      archivedAt: serializer.fromJson<DateTime?>(json['archivedAt']),
     );
   }
   @override
@@ -34391,6 +34422,7 @@ class Notification extends DataClass implements Insertable<Notification> {
       'body': serializer.toJson<String>(body),
       'entityId': serializer.toJson<String?>(entityId),
       'readAt': serializer.toJson<DateTime?>(readAt),
+      'archivedAt': serializer.toJson<DateTime?>(archivedAt),
     };
   }
 
@@ -34407,6 +34439,7 @@ class Notification extends DataClass implements Insertable<Notification> {
     String? body,
     Value<String?> entityId = const Value.absent(),
     Value<DateTime?> readAt = const Value.absent(),
+    Value<DateTime?> archivedAt = const Value.absent(),
   }) => Notification(
     id: id ?? this.id,
     createdAt: createdAt ?? this.createdAt,
@@ -34420,6 +34453,7 @@ class Notification extends DataClass implements Insertable<Notification> {
     body: body ?? this.body,
     entityId: entityId.present ? entityId.value : this.entityId,
     readAt: readAt.present ? readAt.value : this.readAt,
+    archivedAt: archivedAt.present ? archivedAt.value : this.archivedAt,
   );
   Notification copyWithCompanion(NotificationsCompanion data) {
     return Notification(
@@ -34435,6 +34469,9 @@ class Notification extends DataClass implements Insertable<Notification> {
       body: data.body.present ? data.body.value : this.body,
       entityId: data.entityId.present ? data.entityId.value : this.entityId,
       readAt: data.readAt.present ? data.readAt.value : this.readAt,
+      archivedAt: data.archivedAt.present
+          ? data.archivedAt.value
+          : this.archivedAt,
     );
   }
 
@@ -34452,7 +34489,8 @@ class Notification extends DataClass implements Insertable<Notification> {
           ..write('title: $title, ')
           ..write('body: $body, ')
           ..write('entityId: $entityId, ')
-          ..write('readAt: $readAt')
+          ..write('readAt: $readAt, ')
+          ..write('archivedAt: $archivedAt')
           ..write(')'))
         .toString();
   }
@@ -34471,6 +34509,7 @@ class Notification extends DataClass implements Insertable<Notification> {
     body,
     entityId,
     readAt,
+    archivedAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -34487,7 +34526,8 @@ class Notification extends DataClass implements Insertable<Notification> {
           other.title == this.title &&
           other.body == this.body &&
           other.entityId == this.entityId &&
-          other.readAt == this.readAt);
+          other.readAt == this.readAt &&
+          other.archivedAt == this.archivedAt);
 }
 
 class NotificationsCompanion extends UpdateCompanion<Notification> {
@@ -34503,6 +34543,7 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
   final Value<String> body;
   final Value<String?> entityId;
   final Value<DateTime?> readAt;
+  final Value<DateTime?> archivedAt;
   final Value<int> rowid;
   const NotificationsCompanion({
     this.id = const Value.absent(),
@@ -34517,6 +34558,7 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
     this.body = const Value.absent(),
     this.entityId = const Value.absent(),
     this.readAt = const Value.absent(),
+    this.archivedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   NotificationsCompanion.insert({
@@ -34532,6 +34574,7 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
     required String body,
     this.entityId = const Value.absent(),
     this.readAt = const Value.absent(),
+    this.archivedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        createdAt = Value(createdAt),
@@ -34554,6 +34597,7 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
     Expression<String>? body,
     Expression<String>? entityId,
     Expression<DateTime>? readAt,
+    Expression<DateTime>? archivedAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -34569,6 +34613,7 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
       if (body != null) 'body': body,
       if (entityId != null) 'entity_id': entityId,
       if (readAt != null) 'read_at': readAt,
+      if (archivedAt != null) 'archived_at': archivedAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -34586,6 +34631,7 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
     Value<String>? body,
     Value<String?>? entityId,
     Value<DateTime?>? readAt,
+    Value<DateTime?>? archivedAt,
     Value<int>? rowid,
   }) {
     return NotificationsCompanion(
@@ -34601,6 +34647,7 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
       body: body ?? this.body,
       entityId: entityId ?? this.entityId,
       readAt: readAt ?? this.readAt,
+      archivedAt: archivedAt ?? this.archivedAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -34644,6 +34691,9 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
     if (readAt.present) {
       map['read_at'] = Variable<DateTime>(readAt.value);
     }
+    if (archivedAt.present) {
+      map['archived_at'] = Variable<DateTime>(archivedAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -34665,6 +34715,7 @@ class NotificationsCompanion extends UpdateCompanion<Notification> {
           ..write('body: $body, ')
           ..write('entityId: $entityId, ')
           ..write('readAt: $readAt, ')
+          ..write('archivedAt: $archivedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -71079,6 +71130,7 @@ typedef $$NotificationsTableCreateCompanionBuilder =
       required String body,
       Value<String?> entityId,
       Value<DateTime?> readAt,
+      Value<DateTime?> archivedAt,
       Value<int> rowid,
     });
 typedef $$NotificationsTableUpdateCompanionBuilder =
@@ -71095,6 +71147,7 @@ typedef $$NotificationsTableUpdateCompanionBuilder =
       Value<String> body,
       Value<String?> entityId,
       Value<DateTime?> readAt,
+      Value<DateTime?> archivedAt,
       Value<int> rowid,
     });
 
@@ -71188,6 +71241,11 @@ class $$NotificationsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$CompaniesTableFilterComposer get companyId {
     final $$CompaniesTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -71276,6 +71334,11 @@ class $$NotificationsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$CompaniesTableOrderingComposer get companyId {
     final $$CompaniesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -71342,6 +71405,11 @@ class $$NotificationsTableAnnotationComposer
   GeneratedColumn<DateTime> get readAt =>
       $composableBuilder(column: $table.readAt, builder: (column) => column);
 
+  GeneratedColumn<DateTime> get archivedAt => $composableBuilder(
+    column: $table.archivedAt,
+    builder: (column) => column,
+  );
+
   $$CompaniesTableAnnotationComposer get companyId {
     final $$CompaniesTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -71406,6 +71474,7 @@ class $$NotificationsTableTableManager
                 Value<String> body = const Value.absent(),
                 Value<String?> entityId = const Value.absent(),
                 Value<DateTime?> readAt = const Value.absent(),
+                Value<DateTime?> archivedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NotificationsCompanion(
                 id: id,
@@ -71420,6 +71489,7 @@ class $$NotificationsTableTableManager
                 body: body,
                 entityId: entityId,
                 readAt: readAt,
+                archivedAt: archivedAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -71436,6 +71506,7 @@ class $$NotificationsTableTableManager
                 required String body,
                 Value<String?> entityId = const Value.absent(),
                 Value<DateTime?> readAt = const Value.absent(),
+                Value<DateTime?> archivedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => NotificationsCompanion.insert(
                 id: id,
@@ -71450,6 +71521,7 @@ class $$NotificationsTableTableManager
                 body: body,
                 entityId: entityId,
                 readAt: readAt,
+                archivedAt: archivedAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

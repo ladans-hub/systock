@@ -676,6 +676,7 @@ class Notifications extends SyncEntityTable {
   TextColumn get body => text()();
   TextColumn get entityId => text().nullable()();
   DateTimeColumn get readAt => dateTime().nullable()();
+  DateTimeColumn get archivedAt => dateTime().nullable()();
 }
 
 @DriftDatabase(
@@ -744,7 +745,7 @@ class AppDatabase extends _$AppDatabase {
     ),
   );
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -848,6 +849,11 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS idx_returns_sale ON sale_returns(sale_id, created_at)',
         );
+      }
+      // Databases older than v6 create notifications from the current table
+      // definition in the v6 migration, so archived_at already exists there.
+      if (from >= 6 && from < 11) {
+        await m.addColumn(notifications, notifications.archivedAt);
       }
     },
     beforeOpen: (details) async {

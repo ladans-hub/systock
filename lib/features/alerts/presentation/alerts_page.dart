@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart' show OrderingTerm, Value;
+import 'package:drift/drift.dart';
 import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter/material.dart' hide Notification;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,6 +14,9 @@ class AlertsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final db = ref.watch(databaseProvider);
     final query = db.select(db.notifications)
+      ..where(
+        (n) => n.readAt.isNull() & n.archivedAt.isNull() & n.deletedAt.isNull(),
+      )
       ..orderBy([(n) => OrderingTerm.desc(n.createdAt)]);
     return Scaffold(
       appBar: AppBar(
@@ -53,10 +56,37 @@ class AlertsPage extends ConsumerWidget {
                 ),
                 title: Text(alert.title),
                 subtitle: Text(alert.body),
-                trailing: alert.readAt == null
-                    ? const Badge(label: LocalizedText('Novo'))
-                    : null,
-                onTap: () =>
+                trailing: PopupMenuButton<_NotificationAction>(
+                  tooltip: 'Ações da notificação'.localized(context),
+                  onSelected: (action) async {
+                    final now = DateTime.now().toUtc();
+                    final update = action == _NotificationAction.archive
+                        ? NotificationsCompanion(
+                            archivedAt: Value(now),
+                            readAt: Value(now),
+                            updatedAt: Value(now),
+                          )
+                        : NotificationsCompanion(
+                            deletedAt: Value(now),
+                            readAt: Value(now),
+                            updatedAt: Value(now),
+                          );
+                    await (db.update(
+                      db.notifications,
+                    )..where((n) => n.id.equals(alert.id))).write(update);
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: _NotificationAction.archive,
+                      child: LocalizedText('Arquivar'),
+                    ),
+                    PopupMenuItem(
+                      value: _NotificationAction.delete,
+                      child: LocalizedText('Apagar'),
+                    ),
+                  ],
+                ),
+                onTap: () async =>
                     (db.update(
                       db.notifications,
                     )..where((n) => n.id.equals(alert.id))).write(
@@ -72,3 +102,5 @@ class AlertsPage extends ConsumerWidget {
     );
   }
 }
+
+enum _NotificationAction { archive, delete }

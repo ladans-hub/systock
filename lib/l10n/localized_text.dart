@@ -76,6 +76,8 @@ const _english = <String, String>{
   'Abrir ficha': 'Open details',
   'Abrir': 'Open',
   'Acesso restrito': 'Restricted access',
+  'Ações da notificação': 'Notification actions',
+  'Arquivar': 'Archive',
   'Acesso restrito à pasta privada do aplicativo':
       'Restricted access to the application private folder',
   'A indisponibilidade do Drive nunca bloqueia vendas.':

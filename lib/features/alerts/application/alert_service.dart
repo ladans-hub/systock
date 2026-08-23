@@ -29,32 +29,34 @@ class AlertService {
     await _db.transaction(() async {
       for (final row in rows) {
         final productId = row.read<String>('id');
+        final qty = row.read<int>('qty'), name = row.read<String>('name');
+        final title = qty == 0 ? 'Produto sem stock' : 'Stock baixo';
+        final body = '$name atingiu o nível mínimo.';
         final existing =
             await (_db.select(_db.notifications)..where(
                   (n) =>
                       n.companyId.equals(companyId) &
                       n.type.equals('low_stock') &
-                      n.entityId.equals(productId) &
-                      n.readAt.isNull(),
+                      n.entityId.equals(productId),
                 ))
-                .getSingleOrNull();
-        if (existing != null) continue;
-        final qty = row.read<int>('qty'), name = row.read<String>('name');
-        await _db
-            .into(_db.notifications)
-            .insert(
-              NotificationsCompanion.insert(
-                id: _uuid.v7(),
-                companyId: companyId,
-                type: 'low_stock',
-                title: qty == 0 ? 'Produto sem stock' : 'Stock baixo',
-                body: '$name atingiu o nível mínimo.',
-                entityId: Value(productId),
-                createdAt: now,
-                updatedAt: now,
-                deviceId: deviceId,
-              ),
-            );
+                .get();
+        if (existing.isEmpty) {
+          await _db
+              .into(_db.notifications)
+              .insert(
+                NotificationsCompanion.insert(
+                  id: _uuid.v7(),
+                  companyId: companyId,
+                  type: 'low_stock',
+                  title: title,
+                  body: body,
+                  entityId: Value(productId),
+                  createdAt: now,
+                  updatedAt: now,
+                  deviceId: deviceId,
+                ),
+              );
+        }
       }
     });
     if (notify && rows.isNotEmpty) {
