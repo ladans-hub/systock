@@ -1,0 +1,613 @@
+import 'package:drift/drift.dart' show Value, Variable;
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:systock/l10n/localized_text.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:systock/core/database/app_database.dart';
+import 'package:systock/core/database/database_provider.dart';
+import 'package:uuid/uuid.dart';
+import 'package:systock/features/products/application/product_catalog.dart';
+import 'package:systock/core/errors/result.dart';
+import 'package:systock/features/products/application/product_image_service.dart';
+import 'package:systock/core/widgets/platform_controls.dart';
+import 'package:systock/features/products/presentation/product_image.dart';
+import 'package:systock/features/inventory/application/inventory_ledger.dart';
+import 'package:systock/core/utils/money.dart';
+
+class ProductDetailPage extends ConsumerWidget {
+  const ProductDetailPage(this.id, {super.key});
+  final String id;
+  Future<
+    ({
+      Product product,
+      List<ProductBarcode> barcodes,
+      List<InventoryMovement> movements,
+      List<ProductVariant> variants,
+      List<Lot> lots,
+      List<AuditLog> audits,
+      List<SerialNumber> serials,
+    })
+  >
+  load(AppDatabase db) async => (
+    product: await (db.select(
+      db.products,
+    )..where((p) => p.id.equals(id))).getSingle(),
+    barcodes:
+        await (db.select(db.productBarcodes)
+              ..where((b) => b.productId.equals(id))
+              ..where((b) => b.deletedAt.isNull()))
+            .get(),
+    movements: await (db.select(
+      db.inventoryMovements,
+    )..where((m) => m.productId.equals(id))).get(),
+    variants: await (db.select(
+      db.productVariants,
+    )..where((v) => v.productId.equals(id))).get(),
+    lots: await (db.select(
+      db.lots,
+    )..where((l) => l.productId.equals(id))).get(),
+    audits: await (db.select(
+      db.auditLogs,
+    )..where((a) => a.entityId.equals(id))).get(),
+    serials: await (db.select(
+      db.serialNumbers,
+    )..where((s) => s.productId.equals(id))).get(),
+  );
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => FutureBuilder(
+    future: load(ref.watch(databaseProvider)),
+    builder: (context, s) {
+      if (!s.hasData) {
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
+      final d = s.data!, db = ref.read(databaseProvider);
+      return DefaultTabController(
+        length: 6,
+        child: Scaffold(
+          appBar: AppBar(
+            leading: const AdaptiveBackButton(),
+            title: Text(d.product.name),
+            actions: [
+              IconButton(
+                onPressed: () => context.go('/products/${d.product.id}/edit'),
+                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'Editar produto'.localized(context),
+              ),
+              IconButton(
+                onPressed: () => _archive(context, db, d.product),
+                icon: const Icon(Icons.delete_outline),
+                tooltip: 'Remover produto'.localized(context),
+              ),
+            ],
+            bottom: const TabBar(
+              tabs: [
+                Tab(text: 'Visão geral'),
+                Tab(text: 'Stock'),
+                Tab(text: 'Movimentos'),
+                Tab(text: 'Compras'),
+                Tab(text: 'Vendas'),
+                Tab(text: 'Histórico'),
+              ],
+            ),
+          ),
+          body: TabBarView(
+            children: [
+              ListView(
+                padding: const EdgeInsets.all(20),
+                children: [
+                  Card(
+                    child: Column(
+                      children: [
+                        ListTile(
+                          title: const LocalizedText('SKU'),
+                          trailing: Text(d.product.sku ?? '—'),
+                        ),
+                        if (d.product.imagePath != null)
+                          Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: ProductImage(
+                              path: d.product.imagePath,
+                              width: double.infinity,
+                              height: 180,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ListTile(
+                          title: const LocalizedText('Variantes'),
+                          subtitle: Text(
+                            d.variants.isEmpty
+                                ? 'Produto simples'
+                                : d.variants.map((v) => v.name).join(', '),
+                          ),
+                        ),
+                        ListTile(
+                          title: const LocalizedText('Lotes'),
+                          subtitle: Text(
+                            d.lots.isEmpty
+                                ? 'Sem lotes'
+                                : d.lots
+                                      .map(
+                                        (l) =>
+                                            '${l.batchNumber}${l.expiresAt == null ? '' : ' · ${l.expiresAt!.toLocal()}'}',
+                                      )
+                                      .join('\n'),
+                          ),
+                        ),
+                        ListTile(
+                          title: const LocalizedText('Preço de venda'),
+                          trailing: Text(formatMoneyMinor(d.product.saleMinor)),
+                        ),
+                        ListTile(
+                          title: const LocalizedText('Custo'),
+                          trailing: Text(formatMoneyMinor(d.product.costMinor)),
+                        ),
+                        ListTile(
+                          title: const LocalizedText('Códigos de barras'),
+                          subtitle: Text(
+                            d.barcodes.map((b) => b.barcode).join(', '),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _addVariant(context, db, d.product),
+                        icon: const Icon(Icons.tune),
+                        label: const LocalizedText('Variante'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _addBarcode(context, db, d.product),
+                        icon: const Icon(Icons.qr_code),
+                        label: const LocalizedText('Barcode'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _addSerial(context, db, d.product),
+                        icon: const Icon(Icons.numbers),
+                        label: const LocalizedText('Serial / IMEI'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => _addImage(context, db, d.product),
+                        icon: const Icon(Icons.image_outlined),
+                        label: const LocalizedText('Imagem'),
+                      ),
+                    ],
+                  ),
+                  if (d.serials.isNotEmpty)
+                    Card(
+                      child: Column(
+                        children: [
+                          for (final serial in d.serials)
+                            ListTile(
+                              title: Text(serial.serial),
+                              subtitle: Text(serial.imei ?? serial.status),
+                            ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              _ProductStockTab(db: db, product: d.product),
+              ListView(
+                children: d.movements.reversed
+                    .map(
+                      (m) => ListTile(
+                        title: Text(m.movementType),
+                        subtitle: Text(m.reason ?? ''),
+                        trailing: LocalizedText('${m.quantityMilli / 1000}'),
+                      ),
+                    )
+                    .toList(),
+              ),
+              FutureBuilder(
+                future: db
+                    .customSelect(
+                      '''SELECT p.document_number,p.created_at,pi.quantity_milli,pi.unit_cost_minor FROM purchase_items pi JOIN purchases p ON p.id=pi.purchase_id WHERE pi.product_id=? ORDER BY p.created_at DESC LIMIT 100''',
+                      variables: [Variable(id)],
+                    )
+                    .get(),
+                builder: (_, s) => ListView(
+                  children: [
+                    for (final row in s.data ?? const [])
+                      ListTile(
+                        title: Text(row.read<String>('document_number')),
+                        subtitle: Text(
+                          row.read<DateTime>('created_at').toLocal().toString(),
+                        ),
+                        trailing: LocalizedText(
+                          '${row.read<int>('quantity_milli') / 1000} × ${formatMoneyMinor(row.read<int>('unit_cost_minor'))}',
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              FutureBuilder(
+                future: db
+                    .customSelect(
+                      '''SELECT s.document_number,s.created_at,si.quantity_milli,si.total_minor FROM sale_items si JOIN sales s ON s.id=si.sale_id WHERE si.product_id=? ORDER BY s.created_at DESC LIMIT 100''',
+                      variables: [Variable(id)],
+                    )
+                    .get(),
+                builder: (_, s) => ListView(
+                  children: [
+                    for (final row in s.data ?? const [])
+                      ListTile(
+                        title: Text(row.read<String>('document_number')),
+                        subtitle: Text(
+                          row.read<DateTime>('created_at').toLocal().toString(),
+                        ),
+                        trailing: LocalizedText(
+                          '${row.read<int>('quantity_milli') / 1000} · ${formatMoneyMinor(row.read<int>('total_minor'))}',
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              ListView(
+                children: [
+                  for (final audit in d.audits.reversed)
+                    ListTile(
+                      leading: const Icon(Icons.history),
+                      title: Text(audit.action),
+                      subtitle: Text(audit.createdAt.toLocal().toString()),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+
+  Future<void> _addVariant(
+    BuildContext context,
+    AppDatabase db,
+    Product product,
+  ) async {
+    final name = TextEditingController(), sku = TextEditingController();
+    final ok = await _textDialog(context, 'Nova variante', [
+      ('Nome (ex.: 42 / Preto)', name),
+      ('SKU', sku),
+    ]);
+    if (ok != true || name.text.trim().isEmpty) return;
+    final now = DateTime.now().toUtc();
+    await db
+        .into(db.productVariants)
+        .insert(
+          ProductVariantsCompanion.insert(
+            id: const Uuid().v7(),
+            productId: product.id,
+            name: name.text.trim(),
+            sku: Value(sku.text.trim().isEmpty ? null : sku.text.trim()),
+            createdAt: now,
+            updatedAt: now,
+            deviceId: product.deviceId,
+          ),
+        );
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: LocalizedText('Variante adicionada.')),
+      );
+    }
+  }
+
+  Future<void> _addImage(
+    BuildContext context,
+    AppDatabase db,
+    Product product,
+  ) async {
+    final file = await FilePicker.pickFile(type: FileType.image);
+    if (file?.path == null) return;
+    final result = await ProductImageService(
+      db,
+    ).attach(product: product, sourcePath: file!.path!);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(switch (result) {
+          Success() => 'Imagem adicionada.',
+          Failure(:final error) => error.userMessage,
+        }),
+      ),
+    );
+  }
+
+  Future<void> _archive(
+    BuildContext context,
+    AppDatabase db,
+    Product product,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const LocalizedText('Remover produto?'),
+        content: LocalizedText(
+          '${product.name} será arquivado. O histórico de stock, compras e vendas será preservado.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const LocalizedText('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const LocalizedText('Remover'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final result = await ProductCatalog(db).archive(product.id);
+    if (!context.mounted) return;
+    switch (result) {
+      case Success():
+        context.go('/products');
+      case Failure(:final error):
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error.userMessage)));
+    }
+  }
+
+  Future<void> _addBarcode(
+    BuildContext context,
+    AppDatabase db,
+    Product product,
+  ) async {
+    final code = TextEditingController();
+    final ok = await _textDialog(context, 'Novo código de barras', [
+      ('Código', code),
+    ]);
+    if (ok != true || code.text.trim().isEmpty) return;
+    final now = DateTime.now().toUtc();
+    try {
+      await db
+          .into(db.productBarcodes)
+          .insert(
+            ProductBarcodesCompanion.insert(
+              id: const Uuid().v7(),
+              productId: product.id,
+              barcode: code.text.trim(),
+              createdAt: now,
+              updatedAt: now,
+              deviceId: product.deviceId,
+            ),
+          );
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: LocalizedText(
+              'Este código de barras já pertence a outro produto.',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _addSerial(
+    BuildContext context,
+    AppDatabase db,
+    Product product,
+  ) async {
+    final serial = TextEditingController(), imei = TextEditingController();
+    final warehouses = await db.select(db.warehouses).get();
+    if (!context.mounted || warehouses.isEmpty) return;
+    final ok = await _textDialog(context, 'Novo número de série', [
+      ('Serial', serial),
+      ('IMEI opcional', imei),
+    ]);
+    if (ok != true || serial.text.trim().isEmpty) return;
+    final now = DateTime.now().toUtc();
+    await db
+        .into(db.serialNumbers)
+        .insert(
+          SerialNumbersCompanion.insert(
+            id: const Uuid().v7(),
+            productId: product.id,
+            warehouseId: warehouses.first.id,
+            serial: serial.text.trim(),
+            imei: Value(imei.text.trim().isEmpty ? null : imei.text.trim()),
+            createdAt: now,
+            updatedAt: now,
+            deviceId: product.deviceId,
+          ),
+        );
+  }
+
+  Future<bool?> _textDialog(
+    BuildContext context,
+    String title,
+    List<(String, TextEditingController)> fields,
+  ) => showDialog<bool>(
+    context: context,
+    builder: (dialog) => AlertDialog(
+      title: Text(title),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final field in fields)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: TextField(
+                controller: field.$2,
+                decoration: InputDecoration(labelText: field.$1),
+              ),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialog, false),
+          child: const LocalizedText('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(dialog, true),
+          child: const LocalizedText('Salvar'),
+        ),
+      ],
+    ),
+  );
+}
+
+class _ProductStockTab extends StatelessWidget {
+  const _ProductStockTab({required this.db, required this.product});
+  final AppDatabase db;
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder(
+    stream: db
+        .customSelect(
+          '''SELECT w.id warehouse_id,w.name,COALESCE(b.quantity_milli,0) quantity_milli FROM warehouses w LEFT JOIN inventory_balances b ON b.warehouse_id=w.id AND b.product_id=? WHERE w.company_id=? AND w.deleted_at IS NULL ORDER BY w.name''',
+          variables: [Variable(product.id), Variable(product.companyId)],
+          readsFrom: {db.warehouses, db.inventoryBalances},
+        )
+        .watch(),
+    builder: (context, snapshot) {
+      if (!snapshot.hasData) {
+        return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+      }
+      return ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          LocalizedText(
+            'Quantidade atual',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 12),
+          for (final row in snapshot.data!)
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(
+                  child: Icon(Icons.warehouse_outlined),
+                ),
+                title: Text(row.read<String>('name')),
+                subtitle: const LocalizedText(
+                  'Saldo calculado pelos movimentos',
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      (row.read<int>('quantity_milli') / 1000).toStringAsFixed(
+                        3,
+                      ),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    IconButton(
+                      tooltip: 'Editar quantidade'.localized(context),
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: () => _setQuantity(
+                        context,
+                        row.read<String>('warehouse_id'),
+                        row.read<int>('quantity_milli'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      );
+    },
+  );
+
+  Future<void> _setQuantity(
+    BuildContext context,
+    String warehouseId,
+    int currentMilli,
+  ) async {
+    final quantity = TextEditingController(
+      text: (currentMilli / 1000).toStringAsFixed(3),
+    );
+    final reason = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const LocalizedText('Definir quantidade atual'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: quantity,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: InputDecoration(
+                labelText: 'Nova quantidade'.localized(context),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reason,
+              decoration: InputDecoration(
+                labelText: 'Motivo obrigatório'.localized(context),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const LocalizedText('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const LocalizedText('Aplicar ajuste'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final target =
+        (double.tryParse(quantity.text.replaceAll(',', '.')) ?? -1) * 1000;
+    final targetMilli = target.round();
+    final delta = targetMilli - currentMilli;
+    if (targetMilli < 0 || delta == 0 || reason.text.trim().isEmpty) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: LocalizedText(
+              'Informe uma quantidade e um motivo válidos.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    final user = await db.select(db.users).getSingle();
+    final result = await InventoryLedger(db).move(
+      companyId: product.companyId,
+      productId: product.id,
+      warehouseId: warehouseId,
+      quantityMilli: delta,
+      type: delta > 0
+          ? InventoryMovementType.adjustmentIn
+          : InventoryMovementType.adjustmentOut,
+      deviceId: product.deviceId,
+      userId: user.id,
+      reason: reason.text,
+      allowNegative: product.allowNegativeStock,
+    );
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(switch (result) {
+          Success() => 'Quantidade atualizada com movimento de ajuste.',
+          Failure(:final error) => error.userMessage,
+        }),
+      ),
+    );
+  }
+}

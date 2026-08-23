@@ -1,0 +1,13 @@
+{
+  "@@locale": "en",
+  "appName": "Systock",
+  "dashboard": "Overview",
+  "products": "Products",
+  "inventory": "Inventory",
+  "sales": "Sales",
+  "purchases": "Purchases",
+  "settings": "Settings",
+  "save": "Save",
+  "cancel": "Cancel",
+  "offlineSaved": "Changes were saved locally and will sync when a connection is available."
+}

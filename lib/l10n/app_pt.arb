@@ -1,0 +1,13 @@
+{
+  "@@locale": "pt",
+  "appName": "Systock",
+  "dashboard": "Visão geral",
+  "products": "Produtos",
+  "inventory": "Stock",
+  "sales": "Vendas",
+  "purchases": "Compras",
+  "settings": "Configurações",
+  "save": "Salvar",
+  "cancel": "Cancelar",
+  "offlineSaved": "Alterações salvas localmente. Serão sincronizadas quando houver conexão."
+}

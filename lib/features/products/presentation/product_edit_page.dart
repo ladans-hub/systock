@@ -1,0 +1,327 @@
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:systock/l10n/localized_text.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:systock/core/database/app_database.dart';
+import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/core/errors/result.dart';
+import 'package:systock/core/widgets/platform_controls.dart';
+import 'package:systock/features/products/application/product_catalog.dart';
+import 'package:systock/features/products/application/product_image_service.dart';
+import 'package:systock/features/products/presentation/product_image.dart';
+
+class ProductEditPage extends ConsumerStatefulWidget {
+  const ProductEditPage(this.id, {super.key});
+  final String id;
+
+  @override
+  ConsumerState<ProductEditPage> createState() => _ProductEditPageState();
+}
+
+class _ProductEditPageState extends ConsumerState<ProductEditPage> {
+  Product? product;
+  List<Category> categories = const [];
+  List<Brand> brands = const [];
+  List<Unit> units = const [];
+  final name = TextEditingController();
+  final description = TextEditingController();
+  final barcode = TextEditingController();
+  final location = TextEditingController();
+  final shelf = TextEditingController();
+  String? categoryId, brandId, unitId, selectedImage;
+  bool loading = true, saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_load);
+  }
+
+  Future<void> _load() async {
+    final db = ref.read(databaseProvider);
+    final loaded = await (db.select(
+      db.products,
+    )..where((p) => p.id.equals(widget.id))).getSingle();
+    final primaryBarcode =
+        await (db.select(db.productBarcodes)
+              ..where((b) => b.productId.equals(widget.id))
+              ..where((b) => b.primaryBarcode.equals(true))
+              ..limit(1))
+            .getSingleOrNull();
+    categories = await db.select(db.categories).get();
+    brands = await db.select(db.brands).get();
+    units = await db.select(db.units).get();
+    product = loaded;
+    name.text = loaded.name;
+    description.text = loaded.description ?? '';
+    barcode.text = primaryBarcode?.barcode ?? '';
+    location.text = loaded.location ?? '';
+    shelf.text = loaded.shelf ?? '';
+    categoryId = loaded.categoryId;
+    brandId = loaded.brandId;
+    unitId = loaded.unitId;
+    if (mounted) setState(() => loading = false);
+  }
+
+  Future<void> _pickImage() async {
+    final file = await FilePicker.pickFile(type: FileType.image);
+    if (file?.path != null && mounted) {
+      setState(() => selectedImage = file!.path);
+    }
+  }
+
+  Future<void> _save() async {
+    final current = product;
+    if (current == null) return;
+    setState(() => saving = true);
+    final db = ref.read(databaseProvider);
+    final result = await ProductCatalog(db).updateComplete(
+      current: current,
+      name: name.text,
+      description: description.text,
+      sku: current.sku,
+      categoryId: categoryId,
+      brandId: brandId,
+      unitId: unitId,
+      costMinor: current.costMinor,
+      saleMinor: current.saleMinor,
+      wholesaleMinor: current.wholesaleMinor,
+      minimumPriceMinor: current.minimumPriceMinor,
+      minimumStockMilli: current.minimumStockMilli,
+      maximumStockMilli: current.maximumStockMilli,
+      location: location.text,
+      shelf: shelf.text,
+      trackStock: current.trackStock,
+      allowNegativeStock: current.allowNegativeStock,
+      active: current.active,
+      barcode: barcode.text,
+    );
+    if (result case Success()) {
+      if (selectedImage != null) {
+        final updated = await (db.select(
+          db.products,
+        )..where((p) => p.id.equals(widget.id))).getSingle();
+        final imageResult = await ProductImageService(
+          db,
+        ).attach(product: updated, sourcePath: selectedImage!);
+        if (imageResult case Failure(:final error)) {
+          if (mounted) setState(() => saving = false);
+          _message(error.userMessage);
+          return;
+        }
+      }
+      if (mounted) context.go('/products/${widget.id}');
+      return;
+    }
+    if (mounted) setState(() => saving = false);
+    _message((result as Failure<void>).error.userMessage);
+  }
+
+  void _message(String value) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    final imagePath = selectedImage ?? product?.imagePath;
+    return Scaffold(
+      appBar: AppBar(
+        leading: const AdaptiveBackButton(),
+        title: const LocalizedText('Editar produto'),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            border: Border(
+              top: BorderSide(color: Theme.of(context).dividerColor),
+            ),
+          ),
+          child: Align(
+            heightFactor: 1,
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              width: 280,
+              child: AdaptivePrimaryButton(
+                prominent: true,
+                label: saving ? 'A guardar…' : 'Guardar alterações',
+                onPressed: saving ? null : _save,
+              ),
+            ),
+          ),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Center(
+            child: InkWell(
+              onTap: _pickImage,
+              borderRadius: BorderRadius.circular(18),
+              child: Container(
+                width: 180,
+                height: 150,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+                child: imagePath == null
+                    ? const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.add_photo_alternate_outlined, size: 40),
+                          SizedBox(height: 8),
+                          LocalizedText('Adicionar imagem'),
+                        ],
+                      )
+                    : Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          ProductImage(
+                            path: imagePath,
+                            width: double.infinity,
+                            height: double.infinity,
+                            fit: BoxFit.cover,
+                            borderRadius: 0,
+                          ),
+                          const Align(
+                            alignment: Alignment.bottomCenter,
+                            child: ColoredBox(
+                              color: Color(0xB0000000),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: Padding(
+                                  padding: EdgeInsets.all(8),
+                                  child: LocalizedText(
+                                    'Alterar imagem',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.shield_outlined),
+              title: const LocalizedText('Edição segura'),
+              subtitle: const LocalizedText(
+                'Preços, custos, códigos e regras de stock não são alterados neste formulário.',
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          _Section(
+            title: 'Informações gerais',
+            children: [
+              _field(name, 'Nome *'),
+              _field(description, 'Descrição', lines: 3),
+              _dropdown(
+                'Categoria',
+                categoryId,
+                categories.map((e) => (e.id, e.name)).toList(),
+                (value) => setState(() => categoryId = value),
+              ),
+              _dropdown(
+                'Marca',
+                brandId,
+                brands.map((e) => (e.id, e.name)).toList(),
+                (value) => setState(() => brandId = value),
+              ),
+              _dropdown(
+                'Unidade',
+                unitId,
+                units.map((e) => (e.id, '${e.code} · ${e.name}')).toList(),
+                (value) => setState(() => unitId = value),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _Section(
+            title: 'Localização',
+            children: [
+              _field(location, 'Localização'),
+              _field(shelf, 'Prateleira'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _field(
+    TextEditingController controller,
+    String label, {
+    int lines = 1,
+  }) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: TextField(
+      controller: controller,
+      maxLines: lines,
+      decoration: InputDecoration(labelText: label),
+    ),
+  );
+
+  Widget _dropdown(
+    String label,
+    String? value,
+    List<(String, String)> options,
+    ValueChanged<String?> changed,
+  ) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: DropdownButtonFormField<String?>(
+      initialValue: value,
+      decoration: InputDecoration(labelText: label),
+      items: [
+        const DropdownMenuItem(
+          value: null,
+          child: LocalizedText('Não definido'),
+        ),
+        for (final option in options)
+          DropdownMenuItem(value: option.$1, child: Text(option.$2)),
+      ],
+      onChanged: changed,
+    ),
+  );
+}
+
+class _Section extends StatelessWidget {
+  const _Section({required this.title, required this.children});
+  final String title;
+  final List<Widget> children;
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 16),
+          ...children,
+        ],
+      ),
+    ),
+  );
+}
