@@ -81,7 +81,8 @@ class AdaptiveShell extends ConsumerWidget {
               ),
               child: Row(
                 children: [
-                  const Expanded(child: _BrandMark()),
+                  const _BrandMark(),
+                  const SizedBox(width: 10),
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     padding: EdgeInsets.zero,
