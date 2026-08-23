@@ -109,263 +109,270 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const LocalizedText('Visão geral'),
-      actions: [
-        IconButton(
-          onPressed: () => context.go('/alerts'),
-          icon: const Icon(Icons.notifications_outlined),
-          tooltip: 'Alertas'.localized(context),
-        ),
-        const Padding(
-          padding: EdgeInsets.all(12),
-          child: Chip(
-            avatar: Icon(Icons.offline_bolt_outlined, size: 18),
-            label: LocalizedText('SQLite local'),
-          ),
-        ),
-      ],
-    ),
-    body: FutureBuilder<DashboardData>(
-      future: _data,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return _DashboardError(
-            onRetry: () {
-              setState(() => _data = load(ref.read(databaseProvider)));
-            },
-          );
-        }
-        final d = snapshot.data!, currency = d.company.currencyCode;
-        return ListView(
-          padding: const EdgeInsets.all(24),
-          children: [
-            Text(
-              d.company.tradeName,
-              style: Theme.of(
-                context,
-              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            LocalizedText(
-              'Desempenho de ${_date(d.from)} a ${_date(d.to.subtract(const Duration(days: 1)))}.',
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final value in DashboardPeriod.values)
-                  _PeriodOption(
-                    label: _periodLabel(value),
-                    selected: period == value,
-                    onTap: () => _selectPeriod(value),
+  Widget build(BuildContext context) {
+    final mobile = MediaQuery.sizeOf(context).width < 700;
+    return Scaffold(
+      appBar: mobile
+          ? null
+          : AppBar(
+              title: const LocalizedText('Visão geral'),
+              actions: [
+                IconButton(
+                  onPressed: () => context.go('/alerts'),
+                  icon: const Icon(Icons.notifications_outlined),
+                  tooltip: 'Alertas'.localized(context),
+                ),
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Chip(
+                    avatar: Icon(Icons.offline_bolt_outlined, size: 18),
+                    label: LocalizedText('SQLite local'),
                   ),
+                ),
               ],
             ),
-            const SizedBox(height: 24),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final columns = constraints.maxWidth >= 1050
-                    ? 4
-                    : constraints.maxWidth >= 560
-                    ? 2
-                    : 1;
-                final width =
-                    (constraints.maxWidth - (columns - 1) * 14) / columns;
-                return Wrap(
-                  spacing: 14,
-                  runSpacing: 14,
-                  children: [
-                    _Metric(
-                      'Total de vendas',
-                      formatMoneyMinor(
-                        d.kpis.revenueMinor,
-                        symbol: currency == 'MZN' ? 'MT' : currency,
-                      ),
-                      Icons.trending_up,
-                      width,
-                    ),
-                    _Metric(
-                      'Quantidade de vendas',
-                      '${d.kpis.saleCount}',
-                      Icons.receipt_long_outlined,
-                      width,
-                    ),
-                    _Metric(
-                      'Valor médio por venda',
-                      formatMoneyMinor(
-                        d.kpis.averageTicketMinor,
-                        symbol: currency == 'MZN' ? 'MT' : currency,
-                      ),
-                      Icons.calculate_outlined,
-                      width,
-                    ),
-                    _Metric(
-                      'Total no caixa',
-                      formatMoneyMinor(
-                        d.operational.cashNetMinor,
-                        symbol: currency == 'MZN' ? 'MT' : currency,
-                      ),
-                      Icons.account_balance_wallet_outlined,
-                      width,
-                    ),
-                    _Metric(
-                      'Entradas no caixa',
-                      formatMoneyMinor(
-                        d.operational.cashInMinor,
-                        symbol: currency == 'MZN' ? 'MT' : currency,
-                      ),
-                      Icons.south_west_rounded,
-                      width,
-                    ),
-                    _Metric(
-                      'Saídas do caixa',
-                      formatMoneyMinor(
-                        d.operational.cashOutMinor,
-                        symbol: currency == 'MZN' ? 'MT' : currency,
-                      ),
-                      Icons.north_east_rounded,
-                      width,
-                    ),
-                    _Metric(
-                      'Entradas de stock',
-                      _quantity(d.operational.stockInMilli),
-                      Icons.move_to_inbox_outlined,
-                      width,
-                    ),
-                    _Metric(
-                      'Saídas de stock',
-                      _quantity(d.operational.stockOutMilli),
-                      Icons.outbox_outlined,
-                      width,
-                    ),
-                    _Metric(
-                      'Lucro bruto',
-                      formatMoneyMinor(
-                        d.kpis.grossProfitMinor,
-                        symbol: currency == 'MZN' ? 'MT' : currency,
-                      ),
-                      Icons.paid_outlined,
-                      width,
-                    ),
-                    _Metric(
-                      'Produtos',
-                      '${d.products}',
-                      Icons.inventory_2_outlined,
-                      width,
-                    ),
-                    _Metric(
-                      'Stock baixo',
-                      '${d.low}',
-                      Icons.warning_amber,
-                      width,
-                    ),
-                    _Metric(
-                      'Sem stock',
-                      '${d.out}',
-                      Icons.remove_shopping_cart_outlined,
-                      width,
-                    ),
-                    _Metric(
-                      'Valor do stock',
-                      formatMoneyMinor(
-                        d.stockValue,
-                        symbol: currency == 'MZN' ? 'MT' : currency,
-                      ),
-                      Icons.account_balance_wallet_outlined,
-                      width,
-                    ),
-                  ],
-                );
+      body: FutureBuilder<DashboardData>(
+        future: _data,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError) {
+            return _DashboardError(
+              onRetry: () {
+                setState(() => _data = load(ref.read(databaseProvider)));
               },
-            ),
-            const SizedBox(height: 24),
-            _SalesChart(
-              values: d.dailySales,
-              currency: currency,
-              title: 'Vendas por dia · ${_periodLabel(period)}',
-              start: d.from,
-              bucketDays: d.chartBucketDays,
-            ),
-            const SizedBox(height: 24),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final cards = [
-                  _RankingCard(
-                    title: 'Produtos mais vendidos',
-                    rows: d.bestSelling,
-                    currency: currency,
-                  ),
-                  _RankingCard(
-                    title: 'Produtos menos vendidos',
-                    rows: d.leastSelling,
-                    currency: currency,
-                  ),
-                ];
-                if (constraints.maxWidth < 760) {
-                  return Column(
-                    children: [
-                      cards.first,
-                      const SizedBox(height: 12),
-                      cards.last,
-                    ],
-                  );
-                }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: cards.first),
-                    const SizedBox(width: 14),
-                    Expanded(child: cards.last),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    LocalizedText(
-                      'Atenção necessária',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 12),
-                    ListTile(
-                      leading: const Icon(Icons.warning_amber),
-                      title: LocalizedText('${d.low} produtos no mínimo'),
-                      trailing: TextButton(
-                        onPressed: () => context.go('/inventory'),
-                        child: const LocalizedText('Ver stock'),
-                      ),
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.sync),
-                      title: const LocalizedText('Operações locais protegidas'),
-                      subtitle: const LocalizedText(
-                        'A indisponibilidade do Drive nunca bloqueia vendas.',
-                      ),
-                      trailing: TextButton(
-                        onPressed: () => context.go('/settings/sync'),
-                        child: const LocalizedText('Sincronização'),
-                      ),
-                    ),
-                  ],
+            );
+          }
+          final d = snapshot.data!, currency = d.company.currencyCode;
+          return ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              Text(
+                d.company.tradeName,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ),
-          ],
-        );
-      },
-    ),
-  );
+              const SizedBox(height: 6),
+              LocalizedText(
+                'Desempenho de ${_date(d.from)} a ${_date(d.to.subtract(const Duration(days: 1)))}.',
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final value in DashboardPeriod.values)
+                    _PeriodOption(
+                      label: _periodLabel(value),
+                      selected: period == value,
+                      onTap: () => _selectPeriod(value),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final columns = constraints.maxWidth >= 1050
+                      ? 4
+                      : constraints.maxWidth >= 560
+                      ? 2
+                      : 1;
+                  final width =
+                      (constraints.maxWidth - (columns - 1) * 14) / columns;
+                  return Wrap(
+                    spacing: 14,
+                    runSpacing: 14,
+                    children: [
+                      _Metric(
+                        'Total de vendas',
+                        formatMoneyMinor(
+                          d.kpis.revenueMinor,
+                          symbol: currency == 'MZN' ? 'MT' : currency,
+                        ),
+                        Icons.trending_up,
+                        width,
+                      ),
+                      _Metric(
+                        'Quantidade de vendas',
+                        '${d.kpis.saleCount}',
+                        Icons.receipt_long_outlined,
+                        width,
+                      ),
+                      _Metric(
+                        'Valor médio por venda',
+                        formatMoneyMinor(
+                          d.kpis.averageTicketMinor,
+                          symbol: currency == 'MZN' ? 'MT' : currency,
+                        ),
+                        Icons.calculate_outlined,
+                        width,
+                      ),
+                      _Metric(
+                        'Total no caixa',
+                        formatMoneyMinor(
+                          d.operational.cashNetMinor,
+                          symbol: currency == 'MZN' ? 'MT' : currency,
+                        ),
+                        Icons.account_balance_wallet_outlined,
+                        width,
+                      ),
+                      _Metric(
+                        'Entradas no caixa',
+                        formatMoneyMinor(
+                          d.operational.cashInMinor,
+                          symbol: currency == 'MZN' ? 'MT' : currency,
+                        ),
+                        Icons.south_west_rounded,
+                        width,
+                      ),
+                      _Metric(
+                        'Saídas do caixa',
+                        formatMoneyMinor(
+                          d.operational.cashOutMinor,
+                          symbol: currency == 'MZN' ? 'MT' : currency,
+                        ),
+                        Icons.north_east_rounded,
+                        width,
+                      ),
+                      _Metric(
+                        'Entradas de stock',
+                        _quantity(d.operational.stockInMilli),
+                        Icons.move_to_inbox_outlined,
+                        width,
+                      ),
+                      _Metric(
+                        'Saídas de stock',
+                        _quantity(d.operational.stockOutMilli),
+                        Icons.outbox_outlined,
+                        width,
+                      ),
+                      _Metric(
+                        'Lucro bruto',
+                        formatMoneyMinor(
+                          d.kpis.grossProfitMinor,
+                          symbol: currency == 'MZN' ? 'MT' : currency,
+                        ),
+                        Icons.paid_outlined,
+                        width,
+                      ),
+                      _Metric(
+                        'Produtos',
+                        '${d.products}',
+                        Icons.inventory_2_outlined,
+                        width,
+                      ),
+                      _Metric(
+                        'Stock baixo',
+                        '${d.low}',
+                        Icons.warning_amber,
+                        width,
+                      ),
+                      _Metric(
+                        'Sem stock',
+                        '${d.out}',
+                        Icons.remove_shopping_cart_outlined,
+                        width,
+                      ),
+                      _Metric(
+                        'Valor do stock',
+                        formatMoneyMinor(
+                          d.stockValue,
+                          symbol: currency == 'MZN' ? 'MT' : currency,
+                        ),
+                        Icons.account_balance_wallet_outlined,
+                        width,
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              _SalesChart(
+                values: d.dailySales,
+                currency: currency,
+                title: 'Vendas por dia · ${_periodLabel(period)}',
+                start: d.from,
+                bucketDays: d.chartBucketDays,
+              ),
+              const SizedBox(height: 24),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final cards = [
+                    _RankingCard(
+                      title: 'Produtos mais vendidos',
+                      rows: d.bestSelling,
+                      currency: currency,
+                    ),
+                    _RankingCard(
+                      title: 'Produtos menos vendidos',
+                      rows: d.leastSelling,
+                      currency: currency,
+                    ),
+                  ];
+                  if (constraints.maxWidth < 760) {
+                    return Column(
+                      children: [
+                        cards.first,
+                        const SizedBox(height: 12),
+                        cards.last,
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: cards.first),
+                      const SizedBox(width: 14),
+                      Expanded(child: cards.last),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      LocalizedText(
+                        'Atenção necessária',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 12),
+                      ListTile(
+                        leading: const Icon(Icons.warning_amber),
+                        title: LocalizedText('${d.low} produtos no mínimo'),
+                        trailing: TextButton(
+                          onPressed: () => context.go('/inventory'),
+                          child: const LocalizedText('Ver stock'),
+                        ),
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.sync),
+                        title: const LocalizedText(
+                          'Operações locais protegidas',
+                        ),
+                        subtitle: const LocalizedText(
+                          'A indisponibilidade do Drive nunca bloqueia vendas.',
+                        ),
+                        trailing: TextButton(
+                          onPressed: () => context.go('/settings/sync'),
+                          child: const LocalizedText('Sincronização'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 
   String _periodLabel(DashboardPeriod value) => switch (value) {
     DashboardPeriod.week => 'Semana',

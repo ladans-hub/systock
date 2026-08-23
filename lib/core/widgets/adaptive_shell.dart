@@ -79,9 +79,28 @@ class AdaptiveShell extends ConsumerWidget {
                   ),
                 ),
               ),
-              child: const Align(
-                alignment: Alignment.centerLeft,
-                child: _BrandMark(),
+              child: Row(
+                children: [
+                  const Expanded(child: _BrandMark()),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 36,
+                    ),
+                    onPressed: () => context.go('/alerts'),
+                    icon: const Icon(Icons.notifications_outlined, size: 21),
+                    tooltip: 'Alertas'.localized(context),
+                  ),
+                  const SizedBox(width: 6),
+                  const Chip(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    avatar: Icon(Icons.offline_bolt_outlined, size: 15),
+                    label: LocalizedText('SQLite local'),
+                  ),
+                ],
               ),
             ),
           ),
