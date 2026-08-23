@@ -64,7 +64,30 @@ class AdaptiveShell extends ConsumerWidget {
     final current = indexes.indexOf(selectedIndex);
     final selected = current < 0 ? 4 : current;
     return AdaptiveScaffold(
-      body: child,
+      body: Column(
+        children: [
+          SafeArea(
+            bottom: false,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                border: Border(
+                  bottom: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+              ),
+              child: const Align(
+                alignment: Alignment.centerLeft,
+                child: _BrandMark(),
+              ),
+            ),
+          ),
+          Expanded(child: child),
+        ],
+      ),
       bottomNavigationBar: AdaptiveBottomNavigationBar(
         selectedIndex: selected,
         onTap: (i) => i == 4
