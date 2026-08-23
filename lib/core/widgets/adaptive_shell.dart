@@ -64,50 +64,55 @@ class AdaptiveShell extends ConsumerWidget {
     final current = indexes.indexOf(selectedIndex);
     final selected = current < 0 ? 4 : current;
     return AdaptiveScaffold(
-      body: Column(
-        children: [
-          SafeArea(
-            bottom: false,
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                border: Border(
-                  bottom: BorderSide(
-                    color: Theme.of(context).colorScheme.outlineVariant,
+      body: location == '/dashboard'
+          ? Column(
+              children: [
+                SafeArea(
+                  bottom: false,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      border: Border(
+                        bottom: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const _BrandMark(),
+                        const SizedBox(width: 10),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 36,
+                            minHeight: 36,
+                          ),
+                          onPressed: () => context.go('/alerts'),
+                          icon: const Icon(
+                            Icons.notifications_outlined,
+                            size: 21,
+                          ),
+                          tooltip: 'Alertas'.localized(context),
+                        ),
+                        const SizedBox(width: 6),
+                        const Chip(
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          avatar: Icon(Icons.offline_bolt_outlined, size: 15),
+                          label: LocalizedText('SQLite local'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  const _BrandMark(),
-                  const SizedBox(width: 10),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 36,
-                      minHeight: 36,
-                    ),
-                    onPressed: () => context.go('/alerts'),
-                    icon: const Icon(Icons.notifications_outlined, size: 21),
-                    tooltip: 'Alertas'.localized(context),
-                  ),
-                  const SizedBox(width: 6),
-                  const Chip(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    avatar: Icon(Icons.offline_bolt_outlined, size: 15),
-                    label: LocalizedText('SQLite local'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Expanded(child: child),
-        ],
-      ),
+                Expanded(child: child),
+              ],
+            )
+          : child,
       bottomNavigationBar: AdaptiveBottomNavigationBar(
         selectedIndex: selected,
         onTap: (i) => i == 4

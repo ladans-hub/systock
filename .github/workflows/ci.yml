@@ -50,7 +50,15 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build windows --release
+      - name: Package Windows release
+        shell: pwsh
+        run: |
+          if (!(Test-Path "build/windows/x64/runner/Release/systock.exe")) {
+            throw "systock.exe não foi encontrado após a compilação Windows."
+          }
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "build/Systock-Windows-release.zip" -Force
       - uses: actions/upload-artifact@v4
         with:
           name: Systock-Windows-release
-          path: build/windows/x64/runner/Release/**
+          path: build/Systock-Windows-release.zip
+          if-no-files-found: error
