@@ -7,6 +7,7 @@ import 'package:systock/core/database/database_provider.dart';
 import 'package:systock/core/notifications/local_notification_service.dart';
 import 'package:systock/core/sync/background_sync_coordinator.dart';
 import 'package:systock/core/backup/automatic_backup_scheduler.dart';
+import 'package:systock/features/alerts/application/alert_service.dart';
 
 Future<ProviderContainer> bootstrap() async {
   Logger.root.level = kDebugMode ? Level.ALL : Level.INFO;
@@ -22,5 +23,14 @@ Future<ProviderContainer> bootstrap() async {
   unawaited(LocalNotificationService.instance.initialize());
   unawaited(BackgroundSyncCoordinator(database).synchronizeIfAuthorized());
   unawaited(AutomaticBackupScheduler(database).runIfDue());
+  unawaited(_refreshAlerts(database));
+  // Mantém as janelas de validade atualizadas enquanto o app permanece aberto.
+  Timer.periodic(const Duration(hours: 6), (_) => _refreshAlerts(database));
   return container;
+}
+
+Future<void> _refreshAlerts(AppDatabase database) async {
+  final company = await database.select(database.companies).getSingleOrNull();
+  if (company == null) return;
+  await AlertService(database).refresh(company.id, company.deviceId);
 }

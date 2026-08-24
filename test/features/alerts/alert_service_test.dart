@@ -70,4 +70,86 @@ void main() {
     await service.refresh('c1', 'd1');
     expect(await db.select(db.notifications).get(), hasLength(1));
   });
+
+  test(
+    'creates expiry alert by cadence and clears it when lot is empty',
+    () async {
+      final now = DateTime.now().toUtc();
+      await db
+          .into(db.warehouses)
+          .insert(
+            WarehousesCompanion.insert(
+              id: 'w1',
+              companyId: 'c1',
+              name: 'Principal',
+              code: 'P',
+              createdAt: now,
+              updatedAt: now,
+              deviceId: 'd1',
+            ),
+          );
+      await db
+          .into(db.lots)
+          .insert(
+            LotsCompanion.insert(
+              id: 'l1',
+              productId: 'p1',
+              warehouseId: 'w1',
+              batchNumber: 'A1',
+              expiresAt: Value(now.add(const Duration(days: 6))),
+              createdAt: now,
+              updatedAt: now,
+              deviceId: 'd1',
+            ),
+          );
+      await db
+          .into(db.inventoryMovements)
+          .insert(
+            InventoryMovementsCompanion.insert(
+              id: 'm1',
+              companyId: 'c1',
+              productId: 'p1',
+              warehouseId: 'w1',
+              lotId: const Value('l1'),
+              movementType: 'purchase',
+              quantityMilli: 10,
+              balanceBeforeMilli: 0,
+              balanceAfterMilli: 10,
+              createdAt: now,
+              updatedAt: now,
+              deviceId: 'd1',
+            ),
+          );
+      final service = AlertService(db);
+      await service.refresh('c1', 'd1');
+      final expiryAlert = await (db.select(
+        db.notifications,
+      )..where((n) => n.type.equals('expiry'))).getSingle();
+      expect(expiryAlert.entityId, 'l1');
+
+      await db
+          .into(db.inventoryMovements)
+          .insert(
+            InventoryMovementsCompanion.insert(
+              id: 'm2',
+              companyId: 'c1',
+              productId: 'p1',
+              warehouseId: 'w1',
+              lotId: const Value('l1'),
+              movementType: 'sale',
+              quantityMilli: -10,
+              balanceBeforeMilli: 10,
+              balanceAfterMilli: 0,
+              createdAt: now,
+              updatedAt: now,
+              deviceId: 'd1',
+            ),
+          );
+      await service.refresh('c1', 'd1');
+      final alert = await (db.select(
+        db.notifications,
+      )..where((n) => n.id.equals(expiryAlert.id))).getSingle();
+      expect(alert.archivedAt, isNotNull);
+    },
+  );
 }

@@ -3,6 +3,7 @@ import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/errors/result.dart';
+import 'package:systock/features/alerts/application/alert_service.dart';
 import 'package:uuid/uuid.dart';
 
 enum InventoryMovementType {
@@ -44,7 +45,7 @@ class InventoryLedger {
       );
     }
     try {
-      return await _db.transaction(() async {
+      final result = await _db.transaction(() async {
         final query = _db.select(_db.inventoryBalances)
           ..where(
             (b) =>
@@ -136,6 +137,16 @@ class InventoryLedger {
             );
         return Success(after);
       });
+      if (result is Success<int>) {
+        // Atualiza imediatamente alertas de stock/validade após entrada ou saída.
+        // Uma falha de notificação nunca invalida o movimento já confirmado.
+        try {
+          await AlertService(_db).refresh(companyId, deviceId);
+        } catch (_) {
+          // O próximo arranque ou a central de alertas fará nova tentativa.
+        }
+      }
+      return result;
     } catch (error) {
       return Failure(
         StorageFailure('Não foi possível atualizar o stock.', cause: error),

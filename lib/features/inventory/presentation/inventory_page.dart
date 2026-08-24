@@ -40,68 +40,85 @@ class InventoryPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final db = ref.watch(databaseProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: const LocalizedText('Stock'),
-        actions: [
-          TextButton.icon(
-            onPressed: () => context.go('/inventory/lots'),
-            icon: const Icon(Icons.event_busy_outlined),
-            label: const LocalizedText('Lotes'),
-          ),
-          OutlinedButton.icon(
-            onPressed: () => context.go('/inventory/counts'),
-            icon: const Icon(Icons.fact_check_outlined),
-            label: const LocalizedText('Inventário'),
-          ),
-          FilledButton.icon(
-            onPressed: () => _adjust(context, db),
-            icon: const Icon(Icons.tune),
-            label: const LocalizedText('Ajustar'),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const LocalizedText('Stock')),
       body: FutureBuilder(
         future: db.select(db.companies).getSingleOrNull(),
         builder: (context, company) {
           if (company.data == null) {
             return const Center(child: CircularProgressIndicator());
           }
-          return StreamBuilder(
-            stream: rows(db, company.data!.id),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final data = snapshot.data!;
-              if (data.isEmpty) {
-                return const Center(
-                  child: LocalizedText(
-                    'Cadastre produtos para controlar o stock.',
-                  ),
-                );
-              }
-              return ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: data.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (_, i) {
-                  final row = data[i];
-                  return Card(
-                    child: ListTile(
-                      onTap: () =>
-                          context.go('/inventory/product/${row.productId}'),
-                      title: Text(row.product),
-                      subtitle: Text(row.warehouse),
-                      trailing: Text(
-                        (row.quantityMilli / 1000).toStringAsFixed(3),
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      leading: const Icon(Icons.inventory_2_outlined),
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/inventory/lots'),
+                      icon: const Icon(Icons.event_busy_outlined),
+                      label: const LocalizedText('Lotes'),
                     ),
-                  );
-                },
-              );
-            },
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/inventory/counts'),
+                      icon: const Icon(Icons.fact_check_outlined),
+                      label: const LocalizedText('Inventário'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/inventory/adjustments'),
+                      icon: const Icon(Icons.swap_vert_outlined),
+                      label: const LocalizedText('Movimentos'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () => _adjust(context, db),
+                      icon: const Icon(Icons.tune),
+                      label: const LocalizedText('Ajustar'),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: StreamBuilder(
+                  stream: rows(db, company.data!.id),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final data = snapshot.data!;
+                    if (data.isEmpty) {
+                      return const Center(
+                        child: LocalizedText(
+                          'Cadastre produtos para controlar o stock.',
+                        ),
+                      );
+                    }
+                    return ListView.separated(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: data.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      itemBuilder: (_, i) {
+                        final row = data[i];
+                        return Card(
+                          child: ListTile(
+                            onTap: () => context.go(
+                              '/inventory/product/${row.productId}',
+                            ),
+                            title: Text(row.product),
+                            subtitle: Text(row.warehouse),
+                            trailing: Text(
+                              (row.quantityMilli / 1000).toStringAsFixed(3),
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            leading: const Icon(Icons.inventory_2_outlined),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
       ),

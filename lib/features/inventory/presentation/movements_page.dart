@@ -31,20 +31,44 @@ class MovementsPage extends ConsumerWidget {
             separatorBuilder: (_, _) => const SizedBox(height: 8),
             itemBuilder: (_, i) {
               final m = snapshot.data![i];
+              final incoming = m.quantityMilli > 0;
+              final color = incoming ? Colors.green : Colors.red;
               return Card(
+                color: color.withValues(alpha: 0.10),
+                shape: RoundedRectangleBorder(
+                  side: BorderSide(
+                    color: color.withValues(alpha: 0.55),
+                    width: 1.2,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: ListTile(
                   leading: CircleAvatar(
+                    backgroundColor: color,
                     child: Icon(
-                      m.quantityMilli >= 0 ? Icons.add : Icons.remove,
+                      incoming ? Icons.arrow_downward : Icons.arrow_upward,
+                      color: Colors.white,
                     ),
                   ),
-                  title: Text(m.movementType),
+                  title: LocalizedText(
+                    _movementLabel(m.movementType),
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
                   subtitle: LocalizedText(
                     '${m.reason ?? ''}\n${m.createdAt.toLocal()}',
                   ),
                   isThreeLine: true,
-                  trailing: LocalizedText(
-                    '${m.quantityMilli >= 0 ? '+' : ''}${m.quantityMilli / 1000}',
+                  trailing: Text(
+                    '${incoming ? '+' : ''}${m.quantityMilli / 1000}',
+                    style: TextStyle(
+                      color: color,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 18,
+                    ),
                   ),
                 ),
               );
@@ -54,4 +78,20 @@ class MovementsPage extends ConsumerWidget {
       ),
     );
   }
+
+  String _movementLabel(String type) => switch (type) {
+    'purchase' => 'Compra',
+    'sale' => 'Venda',
+    'adjustmentIn' => 'Ajuste de entrada',
+    'adjustmentOut' => 'Ajuste de saída',
+    'transferIn' => 'Transferência recebida',
+    'transferOut' => 'Transferência expedida',
+    'returnIn' => 'Devolução',
+    'damaged' => 'Produto danificado',
+    'expired' => 'Produto vencido',
+    'initialStock' => 'Stock inicial',
+    'production' => 'Produção',
+    'cancellation' => 'Cancelamento',
+    _ => type,
+  };
 }
