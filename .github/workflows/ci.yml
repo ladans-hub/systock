@@ -57,8 +57,22 @@ jobs:
             throw "systock.exe não foi encontrado após a compilação Windows."
           }
           Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "build/Systock-Windows-release.zip" -Force
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "windows/installer/vc_redist.x64.exe"
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "windows/installer/systock.iss"
+          if (!(Test-Path "build/windows-installer/Systock-Setup.exe")) {
+            throw "Systock-Setup.exe não foi gerado."
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: Systock-Windows-release
           path: build/Systock-Windows-release.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Systock-Windows-installer
+          path: build/windows-installer/Systock-Setup.exe
           if-no-files-found: error

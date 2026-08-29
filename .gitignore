@@ -32,6 +32,10 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+/Systock-Windows-release.zip
+/Systock-Setup.exe
+/systock.exe
+/windows/installer/vc_redist.x64.exe
 
 # Local release artifacts and platform dependency caches
 /apps/
