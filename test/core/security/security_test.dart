@@ -7,6 +7,7 @@ import 'package:systock/core/security/pin_hasher.dart';
 import 'package:systock/core/security/pin_recovery_service.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/features/onboarding/application/setup_company.dart';
+import 'package:systock/features/security/application/user_admin_service.dart';
 
 void main() {
   test('PIN uses salted PBKDF2 and constant-time verification', () async {
@@ -70,6 +71,34 @@ void main() {
       );
     },
   );
+  test('administrator can change any user PIN', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    await SetupCompany(db)(
+      tradeName: 'Loja',
+      adminName: 'Admin',
+      username: 'admin',
+    );
+    final user = await db.select(db.users).getSingle();
+
+    final invalid = await UserAdminService(
+      db,
+    ).changePin(userId: user.id, newPin: '12');
+    expect(invalid, isA<Failure<void>>());
+
+    final changed = await UserAdminService(
+      db,
+    ).changePin(userId: user.id, newPin: '5678');
+    expect(changed, isA<Success<void>>());
+    final updated = await db.select(db.users).getSingle();
+    expect(
+      await PinHasher().verify(
+        '5678',
+        PinDigest(updated.pinHash!, updated.pinSalt!),
+      ),
+      isTrue,
+    );
+  });
 }
 
 class _Biometric implements BiometricGate {

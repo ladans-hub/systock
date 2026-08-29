@@ -76,6 +76,38 @@ class UserAdminService {
         ),
       );
 
+  Future<Result<void>> changePin({
+    required String userId,
+    required String newPin,
+  }) async {
+    if (!RegExp(r'^\d{4,12}$').hasMatch(newPin)) {
+      return const Failure(
+        ValidationFailure('O PIN deve conter entre 4 e 12 dígitos.'),
+      );
+    }
+    try {
+      final digest = await PinHasher().hash(newPin);
+      final changed =
+          await (_db.update(
+            _db.users,
+          )..where((user) => user.id.equals(userId))).write(
+            UsersCompanion(
+              pinHash: Value(digest.hashBase64),
+              pinSalt: Value(digest.saltBase64),
+              updatedAt: Value(DateTime.now().toUtc()),
+            ),
+          );
+      if (changed != 1) {
+        return const Failure(StorageFailure('Utilizador não encontrado.'));
+      }
+      return const Success(null);
+    } catch (error) {
+      return Failure(
+        StorageFailure('Não foi possível alterar o PIN.', cause: error),
+      );
+    }
+  }
+
   Future<Result<String>> createRole({
     required String companyId,
     required String name,

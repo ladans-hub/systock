@@ -460,7 +460,7 @@ class _BrandMark extends ConsumerWidget {
       final subtitle = row?.read<String>('subtitle') ?? 'Gestão de Stock';
       final logoPath = row?.readNullable<String>('logo_path');
       return Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
         children: [
           Container(
             width: 34,
@@ -482,17 +482,25 @@ class _BrandMark extends ConsumerWidget {
           ),
           if (!compact) ...[
             const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    softWrap: true,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-                Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-              ],
+                  Text(
+                    subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
           ],
         ],

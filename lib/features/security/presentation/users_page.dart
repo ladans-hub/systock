@@ -48,22 +48,104 @@ class UsersPage extends ConsumerWidget {
                 future: (db.select(
                   db.roles,
                 )..where((r) => r.id.equals(user.roleId))).getSingle(),
-                builder: (_, role) => SwitchListTile(
-                  secondary: CircleAvatar(
+                builder: (_, role) => ListTile(
+                  leading: CircleAvatar(
                     child: Text(user.name.characters.first.toUpperCase()),
                   ),
                   title: Text(user.name),
                   subtitle: LocalizedText(
                     '${user.username} · ${role.data?.name ?? '…'}',
                   ),
-                  value: user.active,
-                  onChanged: (value) =>
-                      UserAdminService(db).setActive(user.id, value),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        onPressed: () => _changePin(context, db, user),
+                        icon: const Icon(Icons.password_outlined),
+                        tooltip: 'Alterar PIN'.localized(context),
+                      ),
+                      Switch(
+                        value: user.active,
+                        onChanged: (value) =>
+                            UserAdminService(db).setActive(user.id, value),
+                      ),
+                    ],
+                  ),
                 ),
               );
             },
           );
         },
+      ),
+    );
+  }
+
+  Future<void> _changePin(
+    BuildContext context,
+    AppDatabase db,
+    User user,
+  ) async {
+    final pin = TextEditingController();
+    final confirmation = TextEditingController();
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: LocalizedText('Alterar PIN de ${user.name}'),
+        content: SizedBox(
+          width: 400,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SecureTextField(
+                controller: pin,
+                autofocus: true,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Novo PIN (4–12 dígitos)'.localized(context),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SecureTextField(
+                controller: confirmation,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Confirmar novo PIN'.localized(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const LocalizedText('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const LocalizedText('Alterar PIN'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !context.mounted) return;
+    if (pin.text != confirmation.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText('Os PINs informados não são iguais.'),
+        ),
+      );
+      return;
+    }
+    final result = await UserAdminService(
+      db,
+    ).changePin(userId: user.id, newPin: pin.text);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(switch (result) {
+          Success() => 'PIN alterado com sucesso.',
+          Failure(:final error) => error.userMessage,
+        }),
       ),
     );
   }
