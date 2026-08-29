@@ -11,6 +11,7 @@ import 'package:systock/app/theme/app_theme.dart';
 import 'package:systock/core/database/database_provider.dart';
 import 'package:systock/core/widgets/global_search.dart';
 import 'package:systock/core/security/session_state.dart';
+import 'package:systock/core/security/permission_gate.dart';
 import 'package:systock/core/widgets/platform_controls.dart';
 import 'package:systock/l10n/generated/app_localizations.dart';
 
@@ -35,29 +36,83 @@ class AdaptiveShell extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => CallbackShortcuts(
-    bindings: {
-      const SingleActivator(LogicalKeyboardKey.keyK, control: true): () =>
-          showCommandPalette(context, ref.read(databaseProvider)),
-      const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () =>
-          showCommandPalette(context, ref.read(databaseProvider)),
-      const SingleActivator(LogicalKeyboardKey.keyF, control: true): () =>
-          showSearch(
-            context: context,
-            delegate: GlobalSearchDelegate(ref.read(databaseProvider)),
-          ),
-    },
-    child: Focus(
-      autofocus: true,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth < 700) return _mobile(context);
-          if (constraints.maxWidth < 1100) return _tablet(context);
-          return _desktop(context);
-        },
+  Widget build(BuildContext context, WidgetRef ref) {
+    final permissions = ref.watch(activePermissionsProvider).valueOrNull;
+    final sellerOnly =
+        permissions != null &&
+        permissions.length == 1 &&
+        permissions.contains('sales.create');
+    if (sellerOnly) {
+      return LayoutBuilder(
+        builder: (context, constraints) => constraints.maxWidth < 700
+            ? Scaffold(
+                body: child,
+                bottomNavigationBar: NavigationBar(
+                  selectedIndex: 0,
+                  onDestinationSelected: (_) => context.go('/pos'),
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.point_of_sale_outlined),
+                      label: 'Ponto de venda',
+                    ),
+                  ],
+                ),
+              )
+            : Scaffold(
+                body: Row(
+                  children: [
+                    SizedBox(
+                      width: 240,
+                      child: SafeArea(
+                        child: Column(
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.all(20),
+                              child: _BrandMark(),
+                            ),
+                            ListTile(
+                              selected: true,
+                              leading: const Icon(Icons.point_of_sale_outlined),
+                              title: const LocalizedText('Ponto de venda'),
+                              onTap: () => context.go('/pos'),
+                            ),
+                            const Spacer(),
+                            const _UserFooter(),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const VerticalDivider(width: 1),
+                    Expanded(child: child),
+                  ],
+                ),
+              ),
+      );
+    }
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): () =>
+            showCommandPalette(context, ref.read(databaseProvider)),
+        const SingleActivator(LogicalKeyboardKey.keyK, meta: true): () =>
+            showCommandPalette(context, ref.read(databaseProvider)),
+        const SingleActivator(LogicalKeyboardKey.keyF, control: true): () =>
+            showSearch(
+              context: context,
+              delegate: GlobalSearchDelegate(ref.read(databaseProvider)),
+            ),
+      },
+      child: Focus(
+        autofocus: true,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (constraints.maxWidth < 700) return _mobile(context);
+            if (constraints.maxWidth < 1100) return _tablet(context);
+            return _desktop(context);
+          },
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _mobile(BuildContext context) {
     const indexes = [0, 1, 2, 3];
@@ -450,12 +505,8 @@ class _UserFooter extends ConsumerWidget {
   const _UserFooter();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => StreamBuilder(
-    stream:
-        (ref.watch(databaseProvider).select(ref.watch(databaseProvider).users)
-              ..where((u) => u.active.equals(true))
-              ..limit(1))
-            .watchSingleOrNull(),
+  Widget build(BuildContext context, WidgetRef ref) => FutureBuilder(
+    future: currentSessionUser(ref.watch(databaseProvider)),
     builder: (context, snapshot) {
       final name = snapshot.data?.name ?? 'Utilizador';
       return Padding(
@@ -498,6 +549,8 @@ class _UserFooter extends ConsumerWidget {
               borderRadius: BorderRadius.circular(8),
               onTap: () {
                 ref.read(sessionLockedProvider.notifier).state = true;
+                ref.read(sessionUserIdProvider.notifier).state = null;
+                ref.invalidate(activePermissionsProvider);
                 context.go('/');
               },
               child: const Padding(

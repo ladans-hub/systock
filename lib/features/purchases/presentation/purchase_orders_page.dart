@@ -5,6 +5,7 @@ import 'package:systock/core/widgets/platform_controls.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/utils/money.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/features/purchases/application/purchase_order_service.dart';
@@ -140,7 +141,7 @@ class PurchaseOrdersPage extends ConsumerWidget {
     );
     if (ok != true) return;
     final company = await db.select(db.companies).getSingle(),
-        user = await db.select(db.users).getSingle();
+        user = await currentSessionUser(db);
     final result = await PurchaseOrderService(db).create(
       companyId: company.id,
       supplierId: supplier.id,
@@ -167,7 +168,7 @@ class PurchaseOrdersPage extends ConsumerWidget {
     PurchaseOrder order,
   ) async {
     final warehouse = await db.select(db.warehouses).getSingle(),
-        user = await db.select(db.users).getSingle();
+        user = await currentSessionUser(db);
     final items = await (db.select(
       db.purchaseOrderItems,
     )..where((i) => i.purchaseOrderId.equals(order.id))).get();

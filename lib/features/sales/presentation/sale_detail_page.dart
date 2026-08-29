@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/utils/money.dart';
 import 'package:systock/core/printing/pdf_receipt_printer.dart';
 import 'package:systock/core/printing/receipt.dart' as model;
@@ -123,7 +124,7 @@ class SaleDetailPage extends ConsumerWidget {
                   );
                   if (ok != true || !context.mounted) return;
                   final db = ref.read(databaseProvider),
-                      user = await db.select(db.users).getSingle();
+                      user = await currentSessionUser(db);
                   final documentNumber = await DocumentNumberService(db).next(
                     companyId: v.company.id,
                     type: 'sale_cancellation',
@@ -273,7 +274,7 @@ class SaleDetailPage extends ConsumerWidget {
       ),
     );
     if (ok != true) return;
-    final user = await db.select(db.users).getSingle(),
+    final user = await currentSessionUser(db),
         q = int.tryParse(quantity.text) ?? 0;
     final result = await ReturnSale(db)(
       saleId: sale.id,

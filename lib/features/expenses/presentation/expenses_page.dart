@@ -4,6 +4,7 @@ import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/utils/money.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/features/expenses/application/expense_service.dart';
@@ -69,7 +70,7 @@ class ExpensesPage extends ConsumerWidget {
   Future<void> add(BuildContext context, AppDatabase db) async {
     var categories = await db.select(db.expenseCategories).get();
     final company = await db.select(db.companies).getSingle(),
-        user = await db.select(db.users).getSingle(),
+        user = await currentSessionUser(db),
         now = DateTime.now().toUtc();
     if (categories.isEmpty) {
       for (final name in const [

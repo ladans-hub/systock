@@ -4,6 +4,7 @@ import 'package:systock/l10n/localized_text.dart';
 import 'package:systock/core/widgets/platform_controls.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/features/products/application/product_spreadsheet_service.dart';
 
@@ -74,7 +75,7 @@ class _ProductImportPageState extends ConsumerState<ProductImportPage> {
     final db = ref.read(databaseProvider),
         company = await db.select(db.companies).getSingle();
     final warehouse = await db.select(db.warehouses).getSingle(),
-        user = await db.select(db.users).getSingle();
+        user = await currentSessionUser(db);
     final result = await ProductSpreadsheetService(db).import(
       preview: source,
       mapping: mapping,

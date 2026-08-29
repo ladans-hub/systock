@@ -33,4 +33,30 @@ void main() {
     expect(result, isA<Failure<String>>());
     expect(await db.select(db.companies).get(), isEmpty);
   });
+
+  test('creates one idempotent POS-only seller login', () async {
+    await SetupCompany(db)(
+      tradeName: 'Loja Maputo',
+      adminName: 'Ana',
+      username: 'ana',
+    );
+
+    await ensureDefaultSeller(db);
+    await ensureDefaultSeller(db);
+
+    final sellerRole = await (db.select(
+      db.roles,
+    )..where((role) => role.name.equals('Vendedor'))).getSingle();
+    final sellerUsers = await (db.select(
+      db.users,
+    )..where((user) => user.roleId.equals(sellerRole.id))).get();
+    final permissions = await (db.select(
+      db.rolePermissions,
+    )..where((permission) => permission.roleId.equals(sellerRole.id))).get();
+
+    expect(sellerUsers, hasLength(1));
+    expect(sellerUsers.single.username, 'vendedor');
+    expect(sellerUsers.single.pinHash, isNotNull);
+    expect(permissions.map((item) => item.permissionCode), ['sales.create']);
+  });
 }

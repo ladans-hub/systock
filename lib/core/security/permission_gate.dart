@@ -4,15 +4,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:systock/core/database/database_provider.dart';
 import 'package:systock/core/security/authorization_service.dart';
+import 'package:systock/core/security/session_state.dart';
 
 final activePermissionsProvider = FutureProvider<Set<String>>((ref) async {
   final db = ref.watch(databaseProvider);
-  final user =
-      await (db.select(db.users)
-            ..where((u) => u.active.equals(true))
-            ..limit(1))
-          .getSingleOrNull();
-  if (user == null) return const {};
+  final inMemoryId = ref.watch(sessionUserIdProvider);
+  final user = inMemoryId == null
+      ? await currentSessionUser(db)
+      : await (db.select(
+          db.users,
+        )..where((u) => u.id.equals(inMemoryId))).getSingleOrNull();
+  if (user == null || !user.active) return const {};
   return AuthorizationService(db).permissionsFor(user.id);
 });
 
@@ -55,6 +57,35 @@ class PermissionBuilder extends ConsumerWidget {
     final allowed = ref.watch(activePermissionsProvider).valueOrNull;
     return allowed?.contains(permission) == true ? builder(context) : fallback;
   }
+}
+
+/// Prevents a POS-only profile from opening administrative routes directly.
+class SessionAccessGate extends ConsumerWidget {
+  const SessionAccessGate({
+    required this.location,
+    required this.child,
+    super.key,
+  });
+
+  final String location;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => ref
+      .watch(activePermissionsProvider)
+      .when(
+        loading: () => const Scaffold(
+          body: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+        error: (_, _) => _Denied(onBack: () => context.go('/')),
+        data: (permissions) {
+          final sellerOnly =
+              permissions.length == 1 && permissions.contains('sales.create');
+          return sellerOnly && location != '/pos'
+              ? _Denied(onBack: () => context.go('/pos'))
+              : child;
+        },
+      );
 }
 
 class _Denied extends StatelessWidget {

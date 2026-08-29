@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,8 @@ import 'package:systock/core/security/pin_hasher.dart';
 import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/security/pin_recovery_service.dart';
 import 'package:systock/core/errors/result.dart';
+import 'package:systock/core/security/permission_gate.dart';
+import 'package:systock/features/onboarding/application/setup_company.dart';
 
 class StartupPage extends ConsumerStatefulWidget {
   const StartupPage({super.key});
@@ -18,6 +21,7 @@ class StartupPage extends ConsumerStatefulWidget {
 
 class _StartupPageState extends ConsumerState<StartupPage> {
   User? user;
+  List<User> users = const [];
   final pin = TextEditingController();
   String? error;
   bool checking = true;
@@ -36,19 +40,29 @@ class _StartupPageState extends ConsumerState<StartupPage> {
       context.go('/onboarding');
       return;
     }
+    await ensureDefaultSeller(db);
     final active =
         await (db.select(db.users)
               ..where((u) => u.active.equals(true))
-              ..limit(1))
-            .getSingle();
+              ..orderBy([(u) => OrderingTerm.asc(u.name)]))
+            .get();
     if (!mounted) return;
+    final remembered = await currentSessionUser(db);
+    if (!mounted) return;
+    final selected = active.firstWhere(
+      (candidate) => candidate.id == remembered.id,
+      orElse: () => active.first,
+    );
     final explicitlyLocked = ref.read(sessionLockedProvider);
     if (!explicitlyLocked &&
-        (active.pinHash == null || active.pinSalt == null)) {
+        active.length == 1 &&
+        (selected.pinHash == null || selected.pinSalt == null)) {
+      ref.read(sessionUserIdProvider.notifier).state = selected.id;
       context.go('/dashboard');
     } else {
       setState(() {
-        user = active;
+        users = active;
+        user = selected;
         checking = false;
       });
     }
@@ -57,8 +71,7 @@ class _StartupPageState extends ConsumerState<StartupPage> {
   Future<void> unlock() async {
     final current = user!;
     if (current.pinHash == null || current.pinSalt == null) {
-      ref.read(sessionLockedProvider.notifier).state = false;
-      if (mounted) context.go('/dashboard');
+      await _openSession(current);
       return;
     }
     final valid = await PinHasher().verify(
@@ -67,11 +80,27 @@ class _StartupPageState extends ConsumerState<StartupPage> {
     );
     if (!mounted) return;
     if (valid) {
-      ref.read(sessionLockedProvider.notifier).state = false;
-      context.go('/dashboard');
+      await _openSession(current);
     } else {
       setState(() => error = 'PIN incorreto.');
     }
+  }
+
+  Future<void> _openSession(User selected) async {
+    final db = ref.read(databaseProvider);
+    await setCurrentSessionUser(db, selected);
+    ref.read(sessionUserIdProvider.notifier).state = selected.id;
+    ref.invalidate(activePermissionsProvider);
+    final permissions = await AuthorizationService(
+      db,
+    ).permissionsFor(selected.id);
+    if (!mounted) return;
+    ref.read(sessionLockedProvider.notifier).state = false;
+    context.go(
+      permissions.length == 1 && permissions.contains('sales.create')
+          ? '/pos'
+          : '/dashboard',
+    );
   }
 
   Future<void> biometric() async {
@@ -79,8 +108,7 @@ class _StartupPageState extends ConsumerState<StartupPage> {
       'Desbloquear o Systock',
     );
     if (ok && mounted) {
-      ref.read(sessionLockedProvider.notifier).state = false;
-      context.go('/dashboard');
+      await _openSession(user!);
     } else if (mounted) {
       setState(
         () => error =
@@ -149,8 +177,7 @@ class _StartupPageState extends ConsumerState<StartupPage> {
     if (!mounted) return;
     switch (result) {
       case Success():
-        ref.read(sessionLockedProvider.notifier).state = false;
-        context.go('/dashboard');
+        await _openSession(user!);
       case Failure(:final error):
         setState(() => this.error = error.userMessage);
     }
@@ -184,6 +211,29 @@ class _StartupPageState extends ConsumerState<StartupPage> {
                     'Olá, ${user!.name}',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    initialValue: user!.id,
+                    decoration: InputDecoration(
+                      labelText: 'Utilizador'.localized(context),
+                    ),
+                    items: [
+                      for (final candidate in users)
+                        DropdownMenuItem(
+                          value: candidate.id,
+                          child: Text(
+                            '${candidate.name} (${candidate.username})',
+                          ),
+                        ),
+                    ],
+                    onChanged: (id) => setState(() {
+                      user = users.firstWhere(
+                        (candidate) => candidate.id == id,
+                      );
+                      pin.clear();
+                      error = null;
+                    }),
                   ),
                   const SizedBox(height: 20),
                   if (user!.pinHash != null)

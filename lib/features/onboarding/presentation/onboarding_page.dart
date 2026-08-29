@@ -11,6 +11,7 @@ import 'package:systock/features/onboarding/application/setup_company.dart';
 import 'package:systock/core/sync/google_drive_auth_service.dart';
 import 'package:systock/core/sync/google_drive_transport.dart';
 import 'package:systock/core/sync/drive_recovery_snapshot.dart';
+import 'package:systock/core/security/session_state.dart';
 
 class OnboardingPage extends ConsumerStatefulWidget {
   const OnboardingPage({super.key});
@@ -21,8 +22,11 @@ class OnboardingPage extends ConsumerStatefulWidget {
 class _OnboardingPageState extends ConsumerState<OnboardingPage> {
   final company = TextEditingController(),
       admin = TextEditingController(),
-      username = TextEditingController();
-  final pin = TextEditingController();
+      username = TextEditingController(),
+      pin = TextEditingController(),
+      seller = TextEditingController(text: 'Vendedor'),
+      sellerUsername = TextEditingController(text: 'vendedor'),
+      sellerPin = TextEditingController(text: '1234');
   String currency = 'MZN';
   bool saving = false;
 
@@ -75,10 +79,21 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     admin.dispose();
     username.dispose();
     pin.dispose();
+    seller.dispose();
+    sellerUsername.dispose();
+    sellerPin.dispose();
     super.dispose();
   }
 
   Future<void> submit() async {
+    if (seller.text.trim().isEmpty || sellerUsername.text.trim().isEmpty) {
+      _message('Preencha o nome e o utilizador do vendedor.');
+      return;
+    }
+    if (!RegExp(r'^\d{4,12}$').hasMatch(sellerPin.text)) {
+      _message('O PIN do vendedor deve conter entre 4 e 12 dígitos.');
+      return;
+    }
     setState(() => saving = true);
     final result = await SetupCompany(ref.read(databaseProvider))(
       tradeName: company.text,
@@ -91,6 +106,19 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     setState(() => saving = false);
     switch (result) {
       case Success():
+        final db = ref.read(databaseProvider);
+        await ensureDefaultSeller(
+          db,
+          name: seller.text,
+          username: sellerUsername.text,
+          pin: sellerPin.text,
+        );
+        final adminUser = await (db.select(
+          db.users,
+        )..where((u) => u.username.equals(username.text.trim()))).getSingle();
+        await setCurrentSessionUser(db, adminUser);
+        if (!mounted) return;
+        ref.read(sessionUserIdProvider.notifier).state = adminUser.id;
         context.go('/dashboard');
       case Failure(:final error):
         ScaffoldMessenger.of(
@@ -157,6 +185,35 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                     decoration: InputDecoration(
                       labelText: 'PIN de acesso opcional (4–12 dígitos)'
                           .localized(context),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const LocalizedText(
+                    'Login do vendedor (acesso somente ao Ponto de Venda)',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: seller,
+                    decoration: InputDecoration(
+                      labelText: 'Nome do vendedor'.localized(context),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: sellerUsername,
+                    decoration: InputDecoration(
+                      labelText: 'Utilizador do vendedor'.localized(context),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: sellerPin,
+                    obscureText: true,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'PIN do vendedor'.localized(context),
                     ),
                   ),
                   const SizedBox(height: 12),

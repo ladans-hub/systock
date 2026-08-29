@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/core/scanner/camera_scanner_page.dart';
 import 'package:systock/core/scanner/barcode_keyboard_decoder.dart';
@@ -492,7 +493,7 @@ class _PosPageState extends ConsumerState<PosPage> {
       if (customerId == null) return;
     }
     setState(() => completing = true);
-    final user = await db.select(db.users).getSingle(),
+    final user = await currentSessionUser(db),
         warehouse = await db.select(db.warehouses).getSingle();
     final cashSession =
         await (db.select(db.cashSessions)

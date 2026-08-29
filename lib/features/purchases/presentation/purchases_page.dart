@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/utils/money.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/features/purchases/application/receive_purchase.dart';
@@ -210,7 +211,7 @@ class PurchasesPage extends ConsumerWidget {
     if (ok != true) return;
     final company = await db.select(db.companies).getSingle(),
         warehouse = await db.select(db.warehouses).getSingle(),
-        user = await db.select(db.users).getSingle();
+        user = await currentSessionUser(db);
     final documentNumber = await DocumentNumberService(db).next(
       companyId: company.id,
       type: 'purchase',

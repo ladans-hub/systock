@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/features/inventory/application/inventory_ledger.dart';
 
@@ -131,7 +132,7 @@ class InventoryPage extends ConsumerWidget {
         )..where((p) => p.deletedAt.isNull())).get(),
         warehouses = await db.select(db.warehouses).get(),
         company = await db.select(db.companies).getSingle(),
-        user = await db.select(db.users).getSingle();
+        user = await currentSessionUser(db);
     if (products.isEmpty || warehouses.isEmpty) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

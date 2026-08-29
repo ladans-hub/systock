@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/features/inventory/application/stock_count_service.dart';
 import 'package:systock/core/widgets/platform_controls.dart';
@@ -99,7 +100,7 @@ class StockCountsPage extends ConsumerWidget {
     );
     if (ok != true) return;
     final company = await db.select(db.companies).getSingle(),
-        user = await db.select(db.users).getSingle();
+        user = await currentSessionUser(db);
     final documentNumber = await DocumentNumberService(db).next(
       companyId: company.id,
       type: 'stock_count',

@@ -16,6 +16,7 @@ import 'package:systock/features/products/presentation/product_image.dart';
 import 'package:systock/core/widgets/async_state_pane.dart';
 import 'package:systock/core/files/file_save_service.dart';
 import 'package:systock/features/inventory/presentation/stock_movement_analytics.dart';
+import 'package:uuid/uuid.dart';
 
 class ProductsPage extends ConsumerStatefulWidget {
   const ProductsPage({super.key});
@@ -125,6 +126,10 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                 context.go('/products/import');
               } else if (value == 'labels') {
                 context.go('/products/labels');
+              } else if (value == 'category') {
+                await _createCategory(context, db);
+              } else if (value == 'brand') {
+                await _createBrand(context, db);
               } else {
                 await _export(context, db);
               }
@@ -141,6 +146,14 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
               PopupMenuItem(
                 value: 'labels',
                 child: LocalizedText('Imprimir etiquetas'),
+              ),
+              PopupMenuItem(
+                value: 'category',
+                child: LocalizedText('Cadastrar categoria'),
+              ),
+              PopupMenuItem(
+                value: 'brand',
+                child: LocalizedText('Cadastrar marca'),
               ),
             ],
           ),
@@ -307,10 +320,112 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     );
   }
 
+  Future<String?> _createCategory(BuildContext context, AppDatabase db) async {
+    final name = TextEditingController();
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const LocalizedText('Nova categoria'),
+        content: TextField(
+          controller: name,
+          autofocus: true,
+          decoration: InputDecoration(labelText: 'Nome'.localized(context)),
+          onSubmitted: (_) => Navigator.pop(dialog, true),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const LocalizedText('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const LocalizedText('Salvar'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || name.text.trim().isEmpty) return null;
+    final company = await db.select(db.companies).getSingle();
+    final duplicate =
+        await (db.select(db.categories)
+              ..where((c) => c.companyId.equals(company.id))
+              ..where((c) => c.name.equals(name.text.trim()))
+              ..where((c) => c.deletedAt.isNull()))
+            .getSingleOrNull();
+    if (duplicate != null) return duplicate.id;
+    final id = const Uuid().v7(), now = DateTime.now().toUtc();
+    await db
+        .into(db.categories)
+        .insert(
+          CategoriesCompanion.insert(
+            id: id,
+            companyId: company.id,
+            name: name.text.trim(),
+            createdAt: now,
+            updatedAt: now,
+            deviceId: company.deviceId,
+          ),
+        );
+    return id;
+  }
+
+  Future<String?> _createBrand(BuildContext context, AppDatabase db) async {
+    final name = TextEditingController();
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const LocalizedText('Nova marca'),
+        content: TextField(
+          controller: name,
+          autofocus: true,
+          decoration: InputDecoration(labelText: 'Nome'.localized(context)),
+          onSubmitted: (_) => Navigator.pop(dialog, true),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const LocalizedText('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const LocalizedText('Salvar'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || name.text.trim().isEmpty) return null;
+    final company = await db.select(db.companies).getSingle();
+    final duplicate =
+        await (db.select(db.brands)
+              ..where((b) => b.companyId.equals(company.id))
+              ..where((b) => b.name.equals(name.text.trim()))
+              ..where((b) => b.deletedAt.isNull()))
+            .getSingleOrNull();
+    if (duplicate != null) return duplicate.id;
+    final id = const Uuid().v7(), now = DateTime.now().toUtc();
+    await db
+        .into(db.brands)
+        .insert(
+          BrandsCompanion.insert(
+            id: id,
+            companyId: company.id,
+            name: name.text.trim(),
+            createdAt: now,
+            updatedAt: now,
+            deviceId: company.deviceId,
+          ),
+        );
+    return id;
+  }
+
   Future<void> _add(BuildContext context, AppDatabase db) async {
     final company = await db.select(db.companies).getSingle();
-    final categories = await db.select(db.categories).get();
-    final brands = await db.select(db.brands).get();
+    var categories = await (db.select(
+      db.categories,
+    )..where((c) => c.deletedAt.isNull())).get();
+    var brands = await (db.select(
+      db.brands,
+    )..where((b) => b.deletedAt.isNull())).get();
     final units = await db.select(db.units).get();
     if (!context.mounted) return;
     final name = TextEditingController(),
@@ -381,36 +496,85 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String?>(
-                    initialValue: categoryId,
-                    decoration: InputDecoration(
-                      labelText: 'Categoria'.localized(context),
-                    ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: null,
-                        child: LocalizedText('Sem categoria'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String?>(
+                          key: ValueKey(
+                            'category-$categoryId-${categories.length}',
+                          ),
+                          initialValue: categoryId,
+                          decoration: InputDecoration(
+                            labelText: 'Categoria'.localized(context),
+                          ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: null,
+                              child: LocalizedText('Sem categoria'),
+                            ),
+                            for (final c in categories)
+                              DropdownMenuItem(
+                                value: c.id,
+                                child: Text(c.name),
+                              ),
+                          ],
+                          onChanged: (v) =>
+                              setDialogState(() => categoryId = v),
+                        ),
                       ),
-                      for (final c in categories)
-                        DropdownMenuItem(value: c.id, child: Text(c.name)),
+                      IconButton(
+                        tooltip: 'Cadastrar categoria'.localized(context),
+                        onPressed: () async {
+                          final id = await _createCategory(dialog, db);
+                          if (id != null) {
+                            categories = await (db.select(
+                              db.categories,
+                            )..where((c) => c.deletedAt.isNull())).get();
+                            setDialogState(() => categoryId = id);
+                          }
+                        },
+                        icon: const Icon(Icons.add_circle_outline),
+                      ),
                     ],
-                    onChanged: (v) => setDialogState(() => categoryId = v),
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String?>(
-                    initialValue: brandId,
-                    decoration: InputDecoration(
-                      labelText: 'Marca'.localized(context),
-                    ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: null,
-                        child: LocalizedText('Sem marca'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String?>(
+                          key: ValueKey('brand-$brandId-${brands.length}'),
+                          initialValue: brandId,
+                          decoration: InputDecoration(
+                            labelText: 'Marca'.localized(context),
+                          ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: null,
+                              child: LocalizedText('Sem marca'),
+                            ),
+                            for (final b in brands)
+                              DropdownMenuItem(
+                                value: b.id,
+                                child: Text(b.name),
+                              ),
+                          ],
+                          onChanged: (v) => setDialogState(() => brandId = v),
+                        ),
                       ),
-                      for (final b in brands)
-                        DropdownMenuItem(value: b.id, child: Text(b.name)),
+                      IconButton(
+                        tooltip: 'Cadastrar marca'.localized(context),
+                        onPressed: () async {
+                          final id = await _createBrand(dialog, db);
+                          if (id != null) {
+                            brands = await (db.select(
+                              db.brands,
+                            )..where((b) => b.deletedAt.isNull())).get();
+                            setDialogState(() => brandId = id);
+                          }
+                        },
+                        icon: const Icon(Icons.add_circle_outline),
+                      ),
                     ],
-                    onChanged: (v) => setDialogState(() => brandId = v),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String?>(

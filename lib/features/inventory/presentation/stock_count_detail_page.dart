@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/features/inventory/application/stock_count_service.dart';
 import 'package:systock/core/widgets/platform_controls.dart';
@@ -90,7 +91,7 @@ class StockCountDetailPage extends ConsumerWidget {
   }
 
   Future<void> approve(BuildContext context, AppDatabase db) async {
-    final user = await db.select(db.users).getSingle(),
+    final user = await currentSessionUser(db),
         result = await StockCountService(db).approve(id, userId: user.id);
     if (!context.mounted) return;
     if (result is Success<void>) {

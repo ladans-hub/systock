@@ -3,6 +3,7 @@ import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/utils/money.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/features/cash/application/cash_session_service.dart';
@@ -144,7 +145,7 @@ class CashPage extends ConsumerWidget {
           ),
         );
     if (ok != true) return;
-    final user = await db.select(db.users).getSingle(),
+    final user = await currentSessionUser(db),
         company = await db.select(db.companies).getSingle();
     await CashSessionService(db).open(
       registerId: register.id,
@@ -187,7 +188,7 @@ class CashPage extends ConsumerWidget {
           ),
         );
     if (ok != true) return;
-    final user = await db.select(db.users).getSingle(),
+    final user = await currentSessionUser(db),
         result = await CashSessionService(db).close(
           sessionId: session.id,
           userId: user.id,

@@ -46,8 +46,10 @@ final appRouter = GoRouter(
     GoRoute(path: '/', builder: (_, _) => const StartupPage()),
     GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingPage()),
     ShellRoute(
-      builder: (_, state, child) =>
-          AdaptiveShell(location: state.uri.path, child: child),
+      builder: (_, state, child) => SessionAccessGate(
+        location: state.uri.path,
+        child: AdaptiveShell(location: state.uri.path, child: child),
+      ),
       routes: [
         GoRoute(path: '/dashboard', builder: (_, _) => const DashboardPage()),
         GoRoute(

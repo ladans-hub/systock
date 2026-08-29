@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/core/security/session_state.dart';
 import 'package:uuid/uuid.dart';
 import 'package:systock/features/products/application/product_catalog.dart';
 import 'package:systock/core/errors/result.dart';
@@ -586,7 +587,7 @@ class _ProductStockTab extends StatelessWidget {
       }
       return;
     }
-    final user = await db.select(db.users).getSingle();
+    final user = await currentSessionUser(db);
     final result = await InventoryLedger(db).move(
       companyId: product.companyId,
       productId: product.id,

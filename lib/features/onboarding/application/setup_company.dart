@@ -159,3 +159,95 @@ const _adminPermissions = [
   'settings.manage',
   'backup.manage',
 ];
+
+/// Adds the standard POS-only login to databases created by older versions.
+Future<void> ensureDefaultSeller(
+  AppDatabase db, {
+  String name = 'Vendedor',
+  String username = 'vendedor',
+  String pin = '1234',
+}) async {
+  final normalizedName = name.trim();
+  final normalizedUsername = username.trim();
+  if (normalizedName.isEmpty || normalizedUsername.isEmpty) {
+    throw ArgumentError('Nome e utilizador do vendedor são obrigatórios.');
+  }
+  if (!RegExp(r'^\d{4,12}$').hasMatch(pin)) {
+    throw ArgumentError('O PIN do vendedor deve conter entre 4 e 12 dígitos.');
+  }
+  final company = await db.select(db.companies).getSingleOrNull();
+  if (company == null) return;
+  var sellerRole =
+      await (db.select(db.roles)
+            ..where((r) => r.companyId.equals(company.id))
+            ..where((r) => r.name.equals('Vendedor')))
+          .getSingleOrNull();
+  final uuid = const Uuid(), now = DateTime.now().toUtc();
+  await db.transaction(() async {
+    await db
+        .into(db.permissions)
+        .insert(
+          PermissionsCompanion.insert(
+            code: 'sales.create',
+            description: 'Acessar e vender no Ponto de Venda',
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
+    if (sellerRole == null) {
+      final roleId = uuid.v7();
+      await db
+          .into(db.roles)
+          .insert(
+            RolesCompanion.insert(
+              id: roleId,
+              companyId: company.id,
+              name: 'Vendedor',
+              systemRole: const Value(true),
+              createdAt: now,
+              updatedAt: now,
+              deviceId: company.deviceId,
+            ),
+          );
+      sellerRole = await (db.select(
+        db.roles,
+      )..where((r) => r.id.equals(roleId))).getSingle();
+    }
+    await db
+        .into(db.rolePermissions)
+        .insert(
+          RolePermissionsCompanion.insert(
+            roleId: sellerRole!.id,
+            permissionCode: 'sales.create',
+          ),
+          mode: InsertMode.insertOrIgnore,
+        );
+    final roleUser = await (db.select(
+      db.users,
+    )..where((u) => u.roleId.equals(sellerRole!.id))).getSingleOrNull();
+    if (roleUser != null) return;
+    final usernameExists =
+        await (db.select(db.users)
+              ..where((u) => u.companyId.equals(company.id))
+              ..where((u) => u.username.equals(normalizedUsername)))
+            .getSingleOrNull();
+    final digest = await PinHasher().hash(pin);
+    await db
+        .into(db.users)
+        .insert(
+          UsersCompanion.insert(
+            id: uuid.v7(),
+            companyId: company.id,
+            roleId: sellerRole!.id,
+            name: normalizedName,
+            username: usernameExists == null
+                ? normalizedUsername
+                : 'vendedor-pos',
+            pinHash: Value(digest.hashBase64),
+            pinSalt: Value(digest.saltBase64),
+            createdAt: now,
+            updatedAt: now,
+            deviceId: company.deviceId,
+          ),
+        );
+  });
+}
