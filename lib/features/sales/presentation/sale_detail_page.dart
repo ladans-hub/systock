@@ -196,7 +196,9 @@ class SaleDetailPage extends ConsumerWidget {
                 children: v.payments
                     .map(
                       (p) => ListTile(
-                        title: Text(p.method),
+                        title: Text(
+                          p.method == 'change:cash' ? 'Troco' : p.method,
+                        ),
                         trailing: Text(formatMoneyMinor(p.amountMinor)),
                       ),
                     )

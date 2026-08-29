@@ -159,4 +159,91 @@ void main() {
     expect(await db.select(db.sales).get(), isEmpty);
     expect(await db.select(db.payments).get(), isEmpty);
   });
+
+  test('cash overpayment records returned change in cash flow', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final company =
+        (await SetupCompany(db)(
+                  tradeName: 'Loja',
+                  adminName: 'Admin',
+                  username: 'admin',
+                )
+                as Success<String>)
+            .value;
+    final user = await db.select(db.users).getSingle();
+    final warehouse = await db.select(db.warehouses).getSingle();
+    final now = DateTime.now().toUtc();
+    await db
+        .into(db.products)
+        .insert(
+          ProductsCompanion.insert(
+            id: 'service',
+            companyId: company,
+            name: 'Serviço',
+            saleMinor: const Value(7500),
+            trackStock: const Value(false),
+            createdAt: now,
+            updatedAt: now,
+            deviceId: 'd1',
+          ),
+        );
+    await db
+        .into(db.cashRegisters)
+        .insert(
+          CashRegistersCompanion.insert(
+            id: 'register',
+            companyId: company,
+            warehouseId: warehouse.id,
+            name: 'Caixa',
+            createdAt: now,
+            updatedAt: now,
+            deviceId: 'd1',
+          ),
+        );
+    await db
+        .into(db.cashSessions)
+        .insert(
+          CashSessionsCompanion.insert(
+            id: 'session',
+            cashRegisterId: 'register',
+            openedBy: user.id,
+            openingMinor: 0,
+            createdAt: now,
+            updatedAt: now,
+            deviceId: 'd1',
+          ),
+        );
+
+    final result = await CompleteSale(db)(
+      companyId: company,
+      warehouseId: warehouse.id,
+      documentNumber: 'VEN-TROCO',
+      userId: user.id,
+      deviceId: 'd1',
+      cashSessionId: 'session',
+      lines: const [
+        SaleLineInput(
+          productId: 'service',
+          description: 'Serviço',
+          quantityMilli: 1000,
+          unitPriceMinor: 7500,
+          unitCostMinor: 0,
+        ),
+      ],
+      payments: const [PaymentInput('cash', 10000)],
+    );
+
+    expect(result, isA<Success<String>>());
+    expect((await db.select(db.sales).getSingle()).paidMinor, 7500);
+    expect(
+      (await db.select(db.payments).get()).map((row) => row.amountMinor),
+      unorderedEquals([10000, -2500]),
+    );
+    expect(
+      (await db.select(db.cashMovements).get()).map((row) => row.amountMinor),
+      unorderedEquals([10000, -2500]),
+    );
+    expect(await db.select(db.inventoryMovements).get(), isEmpty);
+  });
 }

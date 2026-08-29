@@ -130,6 +130,8 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                 await _createCategory(context, db);
               } else if (value == 'brand') {
                 await _createBrand(context, db);
+              } else if (value == 'manage-taxonomy') {
+                if (context.mounted) context.go('/categories');
               } else {
                 await _export(context, db);
               }
@@ -154,6 +156,10 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
               PopupMenuItem(
                 value: 'brand',
                 child: LocalizedText('Cadastrar marca'),
+              ),
+              PopupMenuItem(
+                value: 'manage-taxonomy',
+                child: LocalizedText('Gerir categorias e marcas'),
               ),
             ],
           ),

@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:drift/drift.dart' show InsertMode, Variable;
+import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -45,7 +45,39 @@ class _PosPageState extends ConsumerState<PosPage> {
     Future.microtask(_restoreFavorites);
   }
 
-  void add(Product p) {
+  Future<void> add(Product p) async {
+    if (p.trackStock && !p.allowNegativeStock) {
+      final db = ref.read(databaseProvider);
+      final warehouse =
+          await (db.select(db.warehouses)
+                ..where((w) => w.active.equals(true))
+                ..orderBy([(w) => OrderingTerm.asc(w.code)])
+                ..limit(1))
+              .getSingleOrNull();
+      if (!mounted) return;
+      if (warehouse == null) {
+        _showCartError(
+          'Cadastre um armazém ativo antes de adicionar produtos.',
+        );
+        return;
+      }
+      final balance =
+          await (db.select(db.inventoryBalances)..where(
+                (row) =>
+                    row.productId.equals(p.id) &
+                    row.warehouseId.equals(warehouse.id),
+              ))
+              .getSingleOrNull();
+      if (!mounted) return;
+      final desired = (cart[p.id]?.quantityMilli ?? 0) + 1000;
+      final available = balance?.quantityMilli ?? 0;
+      if (desired > available) {
+        _showCartError(
+          'Stock insuficiente para ${p.name}. Disponível: ${available / 1000}.',
+        );
+        return;
+      }
+    }
     setState(
       () => cart[p.id] = (
         product: p,
@@ -53,6 +85,12 @@ class _PosPageState extends ConsumerState<PosPage> {
       ),
     );
     unawaited(_saveCart('pos.active_cart'));
+  }
+
+  void _showCartError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _saveCart(String key) async {
@@ -196,7 +234,7 @@ class _PosPageState extends ConsumerState<PosPage> {
           readsFrom: {db.products, db.productBarcodes},
         )
         .getSingleOrNull();
-    if (row != null && mounted) add(db.products.map(row.data));
+    if (row != null && mounted) await add(db.products.map(row.data));
   }
 
   @override
@@ -385,13 +423,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       AdaptiveIconButton(
-                                        onPressed: () => setState(
-                                          () => cart[e.product.id] = (
-                                            product: e.product,
-                                            quantityMilli:
-                                                e.quantityMilli + 1000,
-                                          ),
-                                        ),
+                                        onPressed: () => add(e.product),
                                         glyph: PlatformGlyph.add,
                                       ),
                                       AdaptiveIconButton(
@@ -487,62 +519,139 @@ class _PosPageState extends ConsumerState<PosPage> {
   Future<void> finish(AppDatabase db, Company company) async {
     final payments = await _collectPayments();
     if (payments == null || payments.isEmpty) return;
+    final saleTotal = total;
+    final changeMinor =
+        payments.fold<int>(0, (sum, payment) => sum + payment.amountMinor) -
+        saleTotal;
     String? customerId;
     if (payments.any((p) => p.method == 'credit')) {
       customerId = await _selectCustomer(db);
       if (customerId == null) return;
     }
     setState(() => completing = true);
-    final user = await currentSessionUser(db),
-        warehouse = await db.select(db.warehouses).getSingle();
-    final cashSession =
-        await (db.select(db.cashSessions)
-              ..where((s) => s.status.equals('open'))
-              ..limit(1))
-            .getSingleOrNull();
-    final number = await DocumentNumberService(db).next(
-      companyId: company.id,
-      type: 'sale',
-      prefix: 'VEN',
-      deviceId: company.deviceId,
-    );
-    final result = await CompleteSale(db)(
-      companyId: company.id,
-      warehouseId: warehouse.id,
-      documentNumber: number,
-      userId: user.id,
-      deviceId: company.deviceId,
-      lines: cart.values
-          .map(
-            (e) => SaleLineInput(
-              productId: e.product.id,
-              description: e.product.name,
-              quantityMilli: e.quantityMilli,
-              unitPriceMinor: e.product.saleMinor,
-              unitCostMinor: e.product.costMinor,
-            ),
-          )
-          .toList(),
-      payments: payments,
-      customerId: customerId,
-      cashSessionId: cashSession?.id,
-    );
-    if (!mounted) return;
-    setState(() => completing = false);
-    switch (result) {
-      case Success():
-        setState(cart.clear);
-        await _saveCart('pos.active_cart');
-        if (!mounted) return;
+    try {
+      final user = await currentSessionUser(db);
+      final warehouse =
+          await (db.select(db.warehouses)
+                ..where((w) => w.active.equals(true))
+                ..orderBy([(w) => OrderingTerm.asc(w.code)])
+                ..limit(1))
+              .getSingleOrNull();
+      if (warehouse == null) {
+        throw StateError('Cadastre um armazém ativo antes de vender.');
+      }
+      final openCash =
+          db.select(db.cashSessions).join([
+              innerJoin(
+                db.cashRegisters,
+                db.cashRegisters.id.equalsExp(db.cashSessions.cashRegisterId),
+              ),
+            ])
+            ..where(db.cashSessions.status.equals('open'))
+            ..where(db.cashRegisters.warehouseId.equals(warehouse.id))
+            ..limit(1);
+      final cashSession = (await openCash.getSingleOrNull())?.readTable(
+        db.cashSessions,
+      );
+      final number = await DocumentNumberService(db).next(
+        companyId: company.id,
+        type: 'sale',
+        prefix: 'VEN',
+        deviceId: company.deviceId,
+      );
+      final result = await CompleteSale(db)(
+        companyId: company.id,
+        warehouseId: warehouse.id,
+        documentNumber: number,
+        userId: user.id,
+        deviceId: company.deviceId,
+        lines: cart.values
+            .map(
+              (e) => SaleLineInput(
+                productId: e.product.id,
+                description: e.product.name,
+                quantityMilli: e.quantityMilli,
+                unitPriceMinor: e.product.saleMinor,
+                unitCostMinor: e.product.costMinor,
+              ),
+            )
+            .toList(),
+        payments: payments,
+        customerId: customerId,
+        cashSessionId: cashSession?.id,
+      );
+      if (!mounted) return;
+      switch (result) {
+        case Success():
+          setState(cart.clear);
+          await _saveCart('pos.active_cart');
+          if (!mounted) return;
+          if (changeMinor > 0) {
+            await _showChange(number, changeMinor, company.currencyCode);
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: LocalizedText('Venda $number concluída.')),
+            );
+          }
+        case Failure(:final error):
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(error.userMessage)));
+      }
+    } catch (error) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: LocalizedText('Venda $number concluída.')),
+          SnackBar(
+            content: Text(
+              error is StateError
+                  ? error.message
+                  : 'Não foi possível finalizar a venda.',
+            ),
+          ),
         );
-      case Failure(:final error):
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.userMessage)));
+      }
+    } finally {
+      if (mounted) setState(() => completing = false);
     }
   }
+
+  Future<void> _showChange(
+    String documentNumber,
+    int changeMinor,
+    String currencyCode,
+  ) => showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialog) => AlertDialog(
+      icon: const Icon(Icons.payments_outlined, size: 44),
+      title: const LocalizedText('Troco a devolver'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            formatMoneyMinor(
+              changeMinor,
+              symbol: currencyCode == 'MZN' ? 'MT' : currencyCode,
+            ),
+            textAlign: TextAlign.center,
+            style: Theme.of(dialog).textTheme.displaySmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: Theme.of(dialog).colorScheme.primary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          LocalizedText('Venda $documentNumber concluída.'),
+        ],
+      ),
+      actions: [
+        FilledButton.icon(
+          onPressed: () => Navigator.pop(dialog),
+          icon: const Icon(Icons.check),
+          label: const LocalizedText('Troco entregue'),
+        ),
+      ],
+    ),
+  );
 
   Future<List<PaymentInput>?> _collectPayments() async {
     final methods = <String, String>{
@@ -614,7 +723,11 @@ class _PosPageState extends ConsumerState<PosPage> {
                                     decimal: true,
                                   ),
                               decoration: InputDecoration(
-                                labelText: 'Valor'.localized(context),
+                                labelText:
+                                    (rows[i].method == 'cash'
+                                            ? 'Valor recebido'
+                                            : 'Valor')
+                                        .localized(context),
                               ),
                               onChanged: (_) => setDialogState(() {}),
                             ),
@@ -644,11 +757,22 @@ class _PosPageState extends ConsumerState<PosPage> {
                   const Divider(),
                   Row(
                     children: [
-                      const LocalizedText('Por alocar'),
+                      LocalizedText(
+                        allocated() > total ? 'Troco' : 'Por alocar',
+                      ),
                       const Spacer(),
-                      Text(formatMoneyMinor(total - allocated())),
+                      Text(formatMoneyMinor((total - allocated()).abs())),
                     ],
                   ),
+                  if (allocated() > total) ...[
+                    const SizedBox(height: 8),
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: LocalizedText(
+                        'O troco será registrado como saída de dinheiro no caixa.',
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -658,7 +782,19 @@ class _PosPageState extends ConsumerState<PosPage> {
                 child: const LocalizedText('Cancelar'),
               ),
               FilledButton(
-                onPressed: allocated() == total
+                onPressed:
+                    allocated() >= total &&
+                        allocated() - total <=
+                            rows.where((row) => row.method == 'cash').fold<int>(
+                              0,
+                              (sum, row) {
+                                try {
+                                  return sum + parseMoneyMinor(row.amount.text);
+                                } on FormatException {
+                                  return sum;
+                                }
+                              },
+                            )
                     ? () {
                         Navigator.pop(dialog, [
                           for (final row in rows)

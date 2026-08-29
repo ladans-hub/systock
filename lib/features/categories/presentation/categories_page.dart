@@ -1,9 +1,9 @@
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
-import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/l10n/localized_text.dart';
 import 'package:uuid/uuid.dart';
 
 class CategoriesPage extends ConsumerWidget {
@@ -11,123 +11,306 @@ class CategoriesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final db = ref.watch(databaseProvider);
-    return Scaffold(
-      appBar: AppBar(
-        title: const LocalizedText('Categorias'),
-        actions: [
-          IconButton(
-            onPressed: () => add(context, db),
-            icon: const Icon(Icons.add),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const LocalizedText('Categorias e marcas'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Categorias'),
+              Tab(text: 'Marcas'),
+            ],
           ),
-        ],
-      ),
-      body: StreamBuilder<List<Category>>(
-        stream: (db.select(
-          db.categories,
-        )..where((c) => c.deletedAt.isNull())).watch(),
-        builder: (context, s) {
-          if (!s.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (s.data!.isEmpty) {
-            return const Center(
-              child: LocalizedText('Ainda não existem categorias.'),
-            );
-          }
-          return ListView(
-            children: s.data!
-                .map(
-                  (c) => ListTile(
-                    leading: const Icon(Icons.category_outlined),
-                    title: Text(c.name),
-                    subtitle: Text(
-                      c.parentId == null
-                          ? 'Categoria principal'
-                          : 'Subcategoria',
-                    ),
-                  ),
-                )
-                .toList(),
-          );
-        },
+        ),
+        body: TabBarView(
+          children: [_categories(context, db), _brands(context, db)],
+        ),
       ),
     );
   }
 
-  Future<void> add(BuildContext context, AppDatabase db) async {
-    final name = TextEditingController(),
-        parents =
-            await (db.select(db.categories)
-                  ..where((c) => c.parentId.isNull())
-                  ..where((c) => c.deletedAt.isNull()))
-                .get();
-    String? parent;
-    if (!context.mounted) {
+  Widget _categories(BuildContext context, AppDatabase db) => StreamBuilder(
+    stream:
+        (db.select(db.categories)
+              ..where((row) => row.deletedAt.isNull())
+              ..orderBy([(row) => OrderingTerm.asc(row.name)]))
+            .watch(),
+    builder: (context, snapshot) => _CatalogList(
+      emptyText: 'Ainda não existem categorias.',
+      addLabel: 'Nova categoria',
+      rows: [
+        for (final item in snapshot.data ?? const <Category>[])
+          _CatalogRow(
+            name: item.name,
+            icon: Icons.category_outlined,
+            onEdit: () => _editCategory(context, db, item),
+            onDelete: () => _deleteCategory(context, db, item),
+          ),
+      ],
+      onAdd: () => _editCategory(context, db),
+    ),
+  );
+
+  Widget _brands(BuildContext context, AppDatabase db) => StreamBuilder(
+    stream:
+        (db.select(db.brands)
+              ..where((row) => row.deletedAt.isNull())
+              ..orderBy([(row) => OrderingTerm.asc(row.name)]))
+            .watch(),
+    builder: (context, snapshot) => _CatalogList(
+      emptyText: 'Ainda não existem marcas.',
+      addLabel: 'Nova marca',
+      rows: [
+        for (final item in snapshot.data ?? const <Brand>[])
+          _CatalogRow(
+            name: item.name,
+            icon: Icons.sell_outlined,
+            onEdit: () => _editBrand(context, db, item),
+            onDelete: () => _deleteBrand(context, db, item),
+          ),
+      ],
+      onAdd: () => _editBrand(context, db),
+    ),
+  );
+
+  Future<void> _editCategory(
+    BuildContext context,
+    AppDatabase db, [
+    Category? item,
+  ]) async {
+    final name = TextEditingController(text: item?.name);
+    if (!await _nameDialog(
+          context,
+          item == null ? 'Nova categoria' : 'Editar categoria',
+          name,
+        ) ||
+        name.text.trim().isEmpty) {
       return;
     }
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => StatefulBuilder(
-        builder: (context, setDialog) => AlertDialog(
-          title: const LocalizedText('Nova categoria'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: name,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: 'Nome'.localized(context),
-                ),
+    try {
+      final now = DateTime.now().toUtc();
+      if (item == null) {
+        final company = await db.select(db.companies).getSingle();
+        await db
+            .into(db.categories)
+            .insert(
+              CategoriesCompanion.insert(
+                id: const Uuid().v7(),
+                companyId: company.id,
+                name: name.text.trim(),
+                createdAt: now,
+                updatedAt: now,
+                deviceId: company.deviceId,
               ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String?>(
-                initialValue: parent,
-                items: [
-                  const DropdownMenuItem(
-                    value: null,
-                    child: LocalizedText('Categoria principal'),
-                  ),
-                  ...parents.map(
-                    (p) => DropdownMenuItem(value: p.id, child: Text(p.name)),
-                  ),
-                ],
-                onChanged: (v) => setDialog(() => parent = v),
-                decoration: InputDecoration(
-                  labelText: 'Categoria pai'.localized(context),
-                ),
+            );
+      } else {
+        await (db.update(
+          db.categories,
+        )..where((row) => row.id.equals(item.id))).write(
+          CategoriesCompanion(
+            name: Value(name.text.trim()),
+            updatedAt: Value(now),
+            version: Value(item.version + 1),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        _message(context, 'Já existe uma categoria com este nome.');
+      }
+    }
+  }
+
+  Future<void> _editBrand(
+    BuildContext context,
+    AppDatabase db, [
+    Brand? item,
+  ]) async {
+    final name = TextEditingController(text: item?.name);
+    if (!await _nameDialog(
+          context,
+          item == null ? 'Nova marca' : 'Editar marca',
+          name,
+        ) ||
+        name.text.trim().isEmpty) {
+      return;
+    }
+    try {
+      final now = DateTime.now().toUtc();
+      if (item == null) {
+        final company = await db.select(db.companies).getSingle();
+        await db
+            .into(db.brands)
+            .insert(
+              BrandsCompanion.insert(
+                id: const Uuid().v7(),
+                companyId: company.id,
+                name: name.text.trim(),
+                createdAt: now,
+                updatedAt: now,
+                deviceId: company.deviceId,
               ),
-            ],
+            );
+      } else {
+        await (db.update(
+          db.brands,
+        )..where((row) => row.id.equals(item.id))).write(
+          BrandsCompanion(
+            name: Value(name.text.trim()),
+            updatedAt: Value(now),
+            version: Value(item.version + 1),
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        _message(context, 'Já existe uma marca com este nome.');
+      }
+    }
+  }
+
+  Future<void> _deleteCategory(
+    BuildContext context,
+    AppDatabase db,
+    Category item,
+  ) async {
+    if (!await _confirmDelete(context, item.name)) return;
+    await db.transaction(() async {
+      await (db.update(db.products)..where((p) => p.categoryId.equals(item.id)))
+          .write(const ProductsCompanion(categoryId: Value(null)));
+      await (db.update(db.categories)..where((c) => c.parentId.equals(item.id)))
+          .write(const CategoriesCompanion(parentId: Value(null)));
+      await (db.delete(db.categories)..where((c) => c.id.equals(item.id))).go();
+    });
+  }
+
+  Future<void> _deleteBrand(
+    BuildContext context,
+    AppDatabase db,
+    Brand item,
+  ) async {
+    if (!await _confirmDelete(context, item.name)) return;
+    await db.transaction(() async {
+      await (db.update(db.products)..where((p) => p.brandId.equals(item.id)))
+          .write(const ProductsCompanion(brandId: Value(null)));
+      await (db.delete(db.brands)..where((b) => b.id.equals(item.id))).go();
+    });
+  }
+
+  Future<bool> _nameDialog(
+    BuildContext context,
+    String title,
+    TextEditingController controller,
+  ) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (dialog) => AlertDialog(
+          title: LocalizedText(title),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(labelText: 'Nome'.localized(context)),
+            onSubmitted: (_) => Navigator.pop(dialog, true),
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(d, false),
+              onPressed: () => Navigator.pop(dialog, false),
               child: const LocalizedText('Cancelar'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(d, true),
+              onPressed: () => Navigator.pop(dialog, true),
               child: const LocalizedText('Salvar'),
             ),
           ],
         ),
-      ),
-    );
-    if (ok == true && name.text.trim().isNotEmpty) {
-      final company = await db.select(db.companies).getSingle(),
-          now = DateTime.now().toUtc();
-      await db
-          .into(db.categories)
-          .insert(
-            CategoriesCompanion.insert(
-              id: const Uuid().v7(),
-              companyId: company.id,
-              parentId: Value(parent),
-              name: name.text.trim(),
-              createdAt: now,
-              updatedAt: now,
-              deviceId: company.deviceId,
+      ) ??
+      false;
+
+  Future<bool> _confirmDelete(BuildContext context, String name) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (dialog) => AlertDialog(
+          title: const LocalizedText('Remover registro?'),
+          content: LocalizedText(
+            '$name será removido dos produtos existentes.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialog, false),
+              child: const LocalizedText('Cancelar'),
             ),
-          );
-    }
-  }
+            FilledButton(
+              onPressed: () => Navigator.pop(dialog, true),
+              child: const LocalizedText('Remover'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+
+  void _message(BuildContext context, String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+}
+
+class _CatalogRow {
+  const _CatalogRow({
+    required this.name,
+    required this.icon,
+    required this.onEdit,
+    required this.onDelete,
+  });
+  final String name;
+  final IconData icon;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+}
+
+class _CatalogList extends StatelessWidget {
+  const _CatalogList({
+    required this.rows,
+    required this.emptyText,
+    required this.addLabel,
+    required this.onAdd,
+  });
+  final List<_CatalogRow> rows;
+  final String emptyText;
+  final String addLabel;
+  final VoidCallback onAdd;
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: rows.isEmpty
+        ? Center(child: LocalizedText(emptyText))
+        : ListView.separated(
+            padding: const EdgeInsets.all(16),
+            itemCount: rows.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (_, index) {
+              final row = rows[index];
+              return ListTile(
+                leading: Icon(row.icon),
+                title: Text(row.name),
+                trailing: PopupMenuButton<String>(
+                  onSelected: (action) =>
+                      action == 'edit' ? row.onEdit() : row.onDelete(),
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: LocalizedText('Editar'),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: LocalizedText('Remover'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+    floatingActionButton: FloatingActionButton.extended(
+      onPressed: onAdd,
+      icon: const Icon(Icons.add),
+      label: LocalizedText(addLabel),
+    ),
+  );
 }

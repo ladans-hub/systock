@@ -63,14 +63,21 @@ class CompleteSale {
     final tax = lines.fold<int>(0, (s, l) => s + l.taxMinor);
     final total = subtotal - lineDiscount - globalDiscountMinor + tax;
     final allocated = payments.fold<int>(0, (s, p) => s + p.amountMinor);
+    final cashReceived = payments
+        .where((p) => p.method == 'cash')
+        .fold<int>(0, (s, p) => s + p.amountMinor);
     final credit = payments
         .where((p) => p.method == 'credit')
         .fold<int>(0, (s, p) => s + p.amountMinor);
-    final paid = allocated - credit;
-    if (total < 0 || allocated != total || (credit > 0 && customerId == null)) {
+    final change = allocated - total;
+    final paid = allocated - credit - change;
+    if (total < 0 ||
+        allocated < total ||
+        change > cashReceived ||
+        (credit > 0 && customerId == null)) {
       return const Failure(
         ValidationFailure(
-          'O pagamento deve corresponder ao total; vendas a crédito exigem cliente.',
+          'O pagamento deve cobrir o total; troco só pode ser devolvido em dinheiro e vendas a crédito exigem cliente.',
         ),
       );
     }
@@ -118,18 +125,60 @@ class CompleteSale {
                   totalMinor: line.totalMinor,
                 ),
               );
-          final moved = await _ledger.move(
-            companyId: companyId,
-            productId: line.productId,
-            warehouseId: warehouseId,
-            quantityMilli: -line.quantityMilli,
-            type: InventoryMovementType.sale,
-            deviceId: deviceId,
-            userId: userId,
-            reason: 'Venda $documentNumber',
-            referenceId: saleId,
-          );
-          if (moved is Failure<int>) throw StateError(moved.error.userMessage);
+          final product = await (_db.select(
+            _db.products,
+          )..where((p) => p.id.equals(line.productId))).getSingle();
+          if (product.trackStock) {
+            final moved = await _ledger.move(
+              companyId: companyId,
+              productId: line.productId,
+              warehouseId: warehouseId,
+              quantityMilli: -line.quantityMilli,
+              type: InventoryMovementType.sale,
+              deviceId: deviceId,
+              userId: userId,
+              reason: 'Venda $documentNumber',
+              referenceId: saleId,
+              allowNegative: product.allowNegativeStock,
+            );
+            if (moved case Failure<int>(:final error)) {
+              throw _SaleFailure(error);
+            }
+          }
+        }
+        if (change > 0) {
+          await _db
+              .into(_db.payments)
+              .insert(
+                PaymentsCompanion.insert(
+                  id: _uuid.v7(),
+                  companyId: companyId,
+                  saleId: saleId,
+                  method: 'change:cash',
+                  amountMinor: -change,
+                  createdAt: now,
+                  updatedAt: now,
+                  deviceId: deviceId,
+                ),
+              );
+          if (cashSessionId != null) {
+            await _db
+                .into(_db.cashMovements)
+                .insert(
+                  CashMovementsCompanion.insert(
+                    id: _uuid.v7(),
+                    cashSessionId: cashSessionId,
+                    type: 'change',
+                    amountMinor: -change,
+                    referenceId: Value(saleId),
+                    reason: 'Troco da venda $documentNumber',
+                    userId: userId,
+                    createdAt: now,
+                    updatedAt: now,
+                    deviceId: deviceId,
+                  ),
+                );
+          }
         }
         for (final payment in payments) {
           await _db
@@ -178,6 +227,7 @@ class CompleteSale {
           'totalMinor': total,
           'costMinor': cost,
           'paidMinor': paid,
+          'changeMinor': change,
           'createdBy': userId,
           'createdAt': now.toIso8601String(),
           'items': [
@@ -202,6 +252,7 @@ class CompleteSale {
                 'amountMinor': payment.amountMinor,
                 'reference': payment.reference,
               },
+            if (change > 0) {'method': 'change:cash', 'amountMinor': -change},
           ],
         });
         await _db
@@ -244,10 +295,17 @@ class CompleteSale {
         }
         return Success(saleId);
       });
+    } on _SaleFailure catch (failure) {
+      return Failure(failure.error);
     } catch (error) {
       return Failure(
         StorageFailure('Não foi possível finalizar a venda.', cause: error),
       );
     }
   }
+}
+
+class _SaleFailure implements Exception {
+  const _SaleFailure(this.error);
+  final AppFailure error;
 }
