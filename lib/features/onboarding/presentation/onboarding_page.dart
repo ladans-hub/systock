@@ -12,6 +12,7 @@ import 'package:systock/core/sync/google_drive_auth_service.dart';
 import 'package:systock/core/sync/google_drive_transport.dart';
 import 'package:systock/core/sync/drive_recovery_snapshot.dart';
 import 'package:systock/core/security/session_state.dart';
+import 'package:systock/core/widgets/secure_text_field.dart';
 
 class OnboardingPage extends ConsumerStatefulWidget {
   const OnboardingPage({super.key});
@@ -178,9 +179,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
+                  SecureTextField(
                     controller: pin,
-                    obscureText: true,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       labelText: 'PIN de acesso opcional (4–12 dígitos)'
@@ -208,9 +208,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextField(
+                  SecureTextField(
                     controller: sellerPin,
-                    obscureText: true,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
                       labelText: 'PIN do vendedor'.localized(context),

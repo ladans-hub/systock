@@ -12,6 +12,7 @@ import 'package:systock/core/security/pin_recovery_service.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/core/security/permission_gate.dart';
 import 'package:systock/features/onboarding/application/setup_company.dart';
+import 'package:systock/core/widgets/secure_text_field.dart';
 
 class StartupPage extends ConsumerStatefulWidget {
   const StartupPage({super.key});
@@ -133,18 +134,16 @@ class _StartupPageState extends ConsumerState<StartupPage> {
                 'Por segurança, será necessário confirmar a sua identidade com a biometria deste dispositivo.',
               ),
               const SizedBox(height: 16),
-              TextField(
+              SecureTextField(
                 controller: first,
-                obscureText: true,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: 'Novo PIN'.localized(context),
                 ),
               ),
               const SizedBox(height: 12),
-              TextField(
+              SecureTextField(
                 controller: confirmation,
-                obscureText: true,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   labelText: 'Confirmar novo PIN'.localized(context),
@@ -237,10 +236,9 @@ class _StartupPageState extends ConsumerState<StartupPage> {
                   ),
                   const SizedBox(height: 20),
                   if (user!.pinHash != null)
-                    TextField(
+                    SecureTextField(
                       controller: pin,
                       autofocus: true,
-                      obscureText: true,
                       keyboardType: TextInputType.number,
                       onSubmitted: (_) => unlock(),
                       decoration: InputDecoration(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
+import 'package:systock/core/widgets/secure_text_field.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
@@ -107,9 +108,8 @@ class UsersPage extends ConsumerWidget {
                   ],
                   onChanged: (v) => setState(() => roleId = v!),
                 ),
-                TextField(
+                SecureTextField(
                   controller: pin,
-                  obscureText: true,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
                     labelText: 'PIN opcional'.localized(context),
