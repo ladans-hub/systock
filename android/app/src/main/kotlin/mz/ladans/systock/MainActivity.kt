@@ -1,4 +1,4 @@
-package io.ladans.systock
+package mz.ladans.systock
 
 import io.flutter.embedding.android.FlutterActivity
 

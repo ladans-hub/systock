@@ -28,6 +28,12 @@ class _SyncPageState extends ConsumerState<SyncPage> {
   String? email, lastMessage;
 
   @override
+  void dispose() {
+    session?.client.close();
+    super.dispose();
+  }
+
+  @override
   void initState() {
     super.initState();
     Future.microtask(_restoreSession);
@@ -137,7 +143,22 @@ class _SyncPageState extends ConsumerState<SyncPage> {
       return;
     }
     setState(() => busy = true);
-    final transport = GoogleDriveSyncTransport(current.client);
+    // Always request a fresh authorization before a manual sync. Access
+    // tokens are short-lived and a page can remain open for many hours.
+    try {
+      final refreshed = await GoogleDriveAuthService.instance
+          .reconnectSilently();
+      if (refreshed != null) {
+        current.client.close();
+        current = refreshed;
+        session = refreshed;
+        email = refreshed.email;
+      }
+    } catch (_) {
+      // The current token may still be valid; let the engine report the
+      // actual Drive failure without affecting local work.
+    }
+    final transport = GoogleDriveSyncTransport(current!.client);
     final result = await SyncEngine(
       ref.read(databaseProvider),
       transport,
@@ -159,6 +180,11 @@ class _SyncPageState extends ConsumerState<SyncPage> {
       await _saveSetting('sync.last_success', {
         'at': DateTime.now().toUtc().toIso8601String(),
         'summary': lastMessage ?? '',
+      });
+    } else {
+      await _saveSetting('sync.last_failure', {
+        'at': DateTime.now().toUtc().toIso8601String(),
+        'message': lastMessage ?? '',
       });
     }
   }

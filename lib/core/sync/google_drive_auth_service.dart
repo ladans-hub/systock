@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:systock/core/sync/google_drive_transport.dart';
@@ -15,11 +16,31 @@ class GoogleDriveAuthService {
   final _signIn = GoogleSignIn.instance;
   bool _initialized = false;
 
+  static const _appleClientId = String.fromEnvironment(
+    'GOOGLE_APPLE_CLIENT_ID',
+  );
+  static const _serverClientId = String.fromEnvironment(
+    'GOOGLE_SERVER_CLIENT_ID',
+  );
+
+  /// OAuth identifiers are supplied at build time and never committed.
+  /// Apple builds may alternatively obtain the client id from
+  /// GoogleService-Info.plist.
+  String? get configuredClientId {
+    if ((defaultTargetPlatform == TargetPlatform.iOS ||
+            defaultTargetPlatform == TargetPlatform.macOS) &&
+        _appleClientId.isNotEmpty) {
+      return _appleClientId;
+    }
+    return null;
+  }
+
   Future<void> initialize({String? clientId, String? serverClientId}) async {
     if (_initialized) return;
     await _signIn.initialize(
-      clientId: clientId,
-      serverClientId: serverClientId,
+      clientId: clientId ?? configuredClientId,
+      serverClientId:
+          serverClientId ?? (_serverClientId.isEmpty ? null : _serverClientId),
     );
     _initialized = true;
   }

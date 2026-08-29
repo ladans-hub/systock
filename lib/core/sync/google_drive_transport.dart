@@ -146,22 +146,28 @@ class GoogleDriveSyncTransport implements SyncTransport {
       );
       for (final file in page.files ?? const <drive.File>[]) {
         if (file.id == null) continue;
-        final media =
-            await _retry(
-                  () => _api.files.get(
-                    file.id!,
-                    downloadOptions: drive.DownloadOptions.fullMedia,
-                  ),
-                )
-                as drive.Media;
-        final content = await utf8.decoder.bind(media.stream).join();
-        final decoded = jsonDecode(content);
-        final entries = decoded is List<dynamic> ? decoded : [decoded];
-        for (final entry in entries) {
-          final envelope = _fromJson(entry as Map<String, dynamic>);
-          if (!excludingOperationIds.contains(envelope.operationId)) {
-            result.add(envelope);
+        try {
+          final media =
+              await _retry(
+                    () => _api.files.get(
+                      file.id!,
+                      downloadOptions: drive.DownloadOptions.fullMedia,
+                    ),
+                  )
+                  as drive.Media;
+          final content = await utf8.decoder.bind(media.stream).join();
+          final decoded = jsonDecode(content);
+          final entries = decoded is List<dynamic> ? decoded : [decoded];
+          for (final entry in entries) {
+            final envelope = _fromJson(entry as Map<String, dynamic>);
+            if (!excludingOperationIds.contains(envelope.operationId)) {
+              result.add(envelope);
+            }
           }
+        } on FormatException {
+          // A malformed immutable package must not block valid packages.
+        } on TypeError {
+          // Ignore documents that do not implement the sync envelope schema.
         }
       }
       token = page.nextPageToken;

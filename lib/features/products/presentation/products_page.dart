@@ -15,6 +15,7 @@ import 'package:systock/features/products/application/product_image_service.dart
 import 'package:systock/features/products/presentation/product_image.dart';
 import 'package:systock/core/widgets/async_state_pane.dart';
 import 'package:systock/core/files/file_save_service.dart';
+import 'package:systock/features/inventory/presentation/stock_movement_analytics.dart';
 
 class ProductsPage extends ConsumerStatefulWidget {
   const ProductsPage({super.key});
@@ -29,6 +30,45 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   final _scroll = ScrollController();
   bool _nearEnd = false;
   bool gridView = false;
+  bool summaryExpanded = false;
+  AnalyticsPeriod period = AnalyticsPeriod.thirtyDays;
+  DateTimeRange? customRange;
+  ProductChartMode productMode = ProductChartMode.moved;
+
+  DateTimeRange get analyticsRange => rangeForPeriod(period, customRange);
+
+  Future<void> _changePeriod(AnalyticsPeriod value) async {
+    if (value != AnalyticsPeriod.custom) {
+      setState(() => period = value);
+      return;
+    }
+    final initial = customRange ?? analyticsRange;
+    final selected = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: DateTimeRange(
+        start: initial.start,
+        end: initial.end.subtract(const Duration(days: 1)),
+      ),
+    );
+    if (selected == null) return;
+    setState(() {
+      period = value;
+      customRange = DateTimeRange(
+        start: DateTime(
+          selected.start.year,
+          selected.start.month,
+          selected.start.day,
+        ),
+        end: DateTime(
+          selected.end.year,
+          selected.end.month,
+          selected.end.day,
+        ).add(const Duration(days: 1)),
+      );
+    });
+  }
 
   @override
   void initState() {
@@ -121,8 +161,75 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
           if (company == null) {
             return const AsyncLoadingPane();
           }
+          final compact = MediaQuery.sizeOf(context).width < 600;
+          final showSummary = !compact || summaryExpanded;
           return Column(
             children: [
+              if (compact)
+                ListTile(
+                  leading: const Icon(Icons.analytics_outlined),
+                  title: const LocalizedText('Resumo de produtos e movimentos'),
+                  trailing: Icon(
+                    summaryExpanded ? Icons.expand_less : Icons.expand_more,
+                  ),
+                  onTap: () =>
+                      setState(() => summaryExpanded = !summaryExpanded),
+                ),
+              if (showSummary)
+                Flexible(
+                  flex: compact ? 3 : 2,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AnalyticsPeriodPicker(
+                          value: period,
+                          range: analyticsRange,
+                          onChanged: _changePeriod,
+                        ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: DropdownButton<ProductChartMode>(
+                            value: productMode,
+                            items: [
+                              for (final mode in ProductChartMode.values)
+                                DropdownMenuItem(
+                                  value: mode,
+                                  child: LocalizedText(productModeLabel(mode)),
+                                ),
+                            ],
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() => productMode = value);
+                              }
+                            },
+                          ),
+                        ),
+                        StreamBuilder<StockMovementAnalytics>(
+                          stream: watchStockMovementAnalytics(
+                            db,
+                            company.id,
+                            analyticsRange,
+                          ),
+                          builder: (context, analytics) {
+                            if (!analytics.hasData) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+                            return StockMovementSummary(
+                              data: analytics.data!,
+                              showProductCount: true,
+                              productMode: productMode,
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: AdaptiveSearchField(

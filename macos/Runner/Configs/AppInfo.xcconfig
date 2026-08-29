@@ -8,7 +8,7 @@
 PRODUCT_NAME = systock
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = mz.systock.systock
+PRODUCT_BUNDLE_IDENTIFIER = mz.ladans.systock
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2026 mz.systock. All rights reserved.
