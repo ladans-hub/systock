@@ -220,7 +220,7 @@ Future<void> ensureDefaultSeller(
     await db.customStatement(
       "DELETE FROM role_permissions WHERE role_id = '${sellerRole!.id}' AND permission_code <> 'sales.create'",
     );
-    for (final permission in ['sales.create', _sellerResetPermission]) {
+    for (final permission in ['sales.create']) {
       await db
           .into(db.rolePermissions)
           .insert(

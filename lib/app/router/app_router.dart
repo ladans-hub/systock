@@ -139,8 +139,8 @@ final appRouter = GoRouter(
         ),
         GoRoute(
           path: '/settings',
-          builder: (_, _) => const AnyPermissionGate(
-            permissions: ['settings.manage', 'users.reset_admin_pin'],
+          builder: (_, _) => const PermissionGate(
+            permission: 'settings.manage',
             child: SettingsPage(),
           ),
         ),
