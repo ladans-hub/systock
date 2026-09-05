@@ -272,6 +272,13 @@ class AdaptiveShell extends ConsumerWidget {
                   ],
                 ),
               ),
+            CupertinoActionSheetAction(
+              onPressed: () {
+                Navigator.pop(sheetContext);
+                _signOut(context);
+              },
+              child: const LocalizedText('Terminar sessão'),
+            ),
           ],
           cancelButton: CupertinoActionSheetAction(
             onPressed: () => Navigator.pop(sheetContext),
@@ -297,10 +304,27 @@ class AdaptiveShell extends ConsumerWidget {
                   context.go(item.path);
                 },
               ),
+            ListTile(
+              leading: const Icon(Icons.logout_rounded),
+              title: const LocalizedText('Terminar sessão'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _signOut(context);
+              },
+            ),
           ],
         ),
       ),
     );
+  }
+
+  void _signOut(BuildContext context) {
+    // Session state is held only in memory; local data is preserved.
+    final container = ProviderScope.containerOf(context);
+    container.read(sessionLockedProvider.notifier).state = true;
+    container.read(sessionUserIdProvider.notifier).state = null;
+    container.invalidate(activePermissionsProvider);
+    context.go('/');
   }
 
   Widget _tablet(BuildContext context) => Scaffold(
