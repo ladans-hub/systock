@@ -16,12 +16,11 @@ Future<Uint8List> buildStockReportPdf(
       ),
       build: (_) => [
         pw.TableHelper.fromTextArray(
-          headers: const ['Produto', 'SKU', 'Armazém', 'Qtd.', 'Valor'],
+          headers: const ['Produto', 'Armazém', 'Qtd.', 'Valor'],
           data: [
             for (final row in rows)
               [
                 row.name,
-                row.sku ?? '',
                 row.warehouse,
                 (row.quantityMilli / 1000).toStringAsFixed(3),
                 formatMoneyMinor(row.valueMinor),

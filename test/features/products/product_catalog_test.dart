@@ -23,7 +23,6 @@ void main() {
         companyId: company,
         deviceId: 'd',
         name: 'Coca-Cola 2L',
-        sku: 'COCA2',
         barcode: '5601234567890',
         saleMinor: 15000,
       );
@@ -34,6 +33,39 @@ void main() {
       expect(page.single.name, 'Coca-Cola 2L');
     },
   );
+  test('initial quantity creates the first stock entry', () async {
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+    final company =
+        (await SetupCompany(db)(
+                  tradeName: 'Loja',
+                  adminName: 'Admin',
+                  username: 'admin',
+                )
+                as Success<String>)
+            .value;
+    final warehouse = await db.select(db.warehouses).getSingle();
+    final user = await db.select(db.users).getSingle();
+
+    final result = await ProductCatalog(db).create(
+      companyId: company,
+      deviceId: 'd',
+      name: 'Arroz 1 kg',
+      barcode: '5601234567000',
+      initialQuantityMilli: 22000,
+      warehouseId: warehouse.id,
+      userId: user.id,
+    );
+
+    expect(result, isA<Success<String>>());
+    expect(
+      (await db.select(db.inventoryBalances).getSingle()).quantityMilli,
+      22000,
+    );
+    final movement = await db.select(db.inventoryMovements).getSingle();
+    expect(movement.movementType, 'initialStock');
+    expect(movement.quantityMilli, 22000);
+  });
   test(
     'duplicate barcode returns human-safe failure and rolls back product',
     () async {

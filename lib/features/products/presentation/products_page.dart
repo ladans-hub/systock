@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/features/products/application/product_catalog.dart';
 import 'package:systock/core/utils/money.dart';
@@ -252,7 +253,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: AdaptiveSearchField(
-                  hintText: 'Nome, SKU ou código de barras'.localized(context),
+                  hintText: 'Nome ou código de barras'.localized(context),
                   onChanged: _search,
                 ),
               ),
@@ -435,14 +436,12 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     final units = await db.select(db.units).get();
     if (!context.mounted) return;
     final name = TextEditingController(),
-        sku = TextEditingController(),
         barcode = TextEditingController(),
         price = TextEditingController(),
         cost = TextEditingController(),
         wholesale = TextEditingController(),
-        minimumStock = TextEditingController(text: '0');
+        quantity = TextEditingController(text: '0');
     String? categoryId, brandId, unitId = units.firstOrNull?.id, imagePath;
-    var trackStock = true, allowNegative = false;
     final submit = await showDialog<bool>(
       context: context,
       builder: (dialog) => StatefulBuilder(
@@ -599,9 +598,9 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                   ),
                   const SizedBox(height: 12),
                   TextField(
-                    controller: sku,
+                    controller: barcode,
                     decoration: InputDecoration(
-                      labelText: 'SKU'.localized(context),
+                      labelText: 'Código de barras'.localized(context),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -630,29 +629,15 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                   ),
                   const SizedBox(height: 12),
                   TextField(
-                    controller: minimumStock,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Stock mínimo'.localized(context),
+                    controller: quantity,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
                     ),
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const LocalizedText('Controlar stock'),
-                    value: trackStock,
-                    onChanged: (v) => setDialogState(() => trackStock = v),
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const LocalizedText('Permitir stock negativo'),
-                    value: allowNegative,
-                    onChanged: (v) => setDialogState(() => allowNegative = v),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: barcode,
                     decoration: InputDecoration(
-                      labelText: 'Código de barras'.localized(context),
+                      labelText: 'Quantidade inicial *'.localized(context),
+                      helperText:
+                          'Esta quantidade será a primeira entrada de stock'
+                              .localized(context),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -681,6 +666,12 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
       ),
     );
     if (submit != true || !context.mounted) return;
+    if (barcode.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: LocalizedText('Informe o código de barras.')),
+      );
+      return;
+    }
     int minor, costMinor, wholesaleMinor;
     try {
       minor = price.text.trim().isEmpty ? 0 : parseMoneyMinor(price.text);
@@ -694,21 +685,47 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
       );
       return;
     }
+    final parsedQuantity = double.tryParse(quantity.text.replaceAll(',', '.'));
+    if (parsedQuantity == null || parsedQuantity < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: LocalizedText('Informe uma quantidade válida.'),
+        ),
+      );
+      return;
+    }
+    final warehouse =
+        await (db.select(db.warehouses)
+              ..where((w) => w.companyId.equals(company.id))
+              ..where((w) => w.deletedAt.isNull())
+              ..where((w) => w.active.equals(true))
+              ..limit(1))
+            .getSingleOrNull();
+    final user = await currentSessionUser(db);
+    if (warehouse == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: LocalizedText('Cadastre um armazém antes do produto.'),
+          ),
+        );
+      }
+      return;
+    }
     final result = await ProductCatalog(db).create(
       companyId: company.id,
       deviceId: company.deviceId,
       name: name.text,
-      sku: sku.text,
       barcode: barcode.text,
       saleMinor: minor,
       costMinor: costMinor,
       wholesaleMinor: wholesaleMinor,
-      minimumStockMilli: (int.tryParse(minimumStock.text) ?? 0) * 1000,
       categoryId: categoryId,
       brandId: brandId,
       unitId: unitId,
-      trackStock: trackStock,
-      allowNegativeStock: allowNegative,
+      initialQuantityMilli: (parsedQuantity * 1000).round(),
+      warehouseId: warehouse.id,
+      userId: user.id,
     );
     if (!context.mounted) {
       return;
@@ -813,7 +830,7 @@ class _ProductListCard extends StatelessWidget {
       onTap: onOpen,
       leading: ProductImage(path: product.imagePath, width: 48, height: 48),
       title: Text(product.name),
-      subtitle: Text(product.sku ?? 'Sem SKU'),
+      subtitle: const LocalizedText('Produto com controlo de stock'),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

@@ -50,7 +50,7 @@ class GlobalSearchDelegate extends SearchDelegate<GlobalSearchResult?> {
     if (query.trim().isEmpty) return const [];
     final term = '%${query.trim().toLowerCase()}%';
     final rows = await db.customSelect('''
-      SELECT 'Produto' type,id,name title,COALESCE(sku,'') subtitle,'/products/'||id route FROM products WHERE deleted_at IS NULL AND (lower(name) LIKE ? OR lower(COALESCE(sku,'')) LIKE ?)
+      SELECT 'Produto' type,p.id,p.name title,COALESCE((SELECT barcode FROM product_barcodes b WHERE b.product_id=p.id AND b.deleted_at IS NULL ORDER BY b.primary_barcode DESC LIMIT 1),'') subtitle,'/products/'||p.id route FROM products p WHERE p.deleted_at IS NULL AND (lower(p.name) LIKE ? OR EXISTS(SELECT 1 FROM product_barcodes b WHERE b.product_id=p.id AND b.deleted_at IS NULL AND lower(b.barcode) LIKE ?))
       UNION ALL SELECT 'Cliente',id,name,COALESCE(phone,''),'/customers' FROM customers WHERE deleted_at IS NULL AND lower(name) LIKE ?
       UNION ALL SELECT 'Fornecedor',id,name,COALESCE(phone,''),'/suppliers' FROM suppliers WHERE deleted_at IS NULL AND lower(name) LIKE ?
       UNION ALL SELECT 'Venda',id,document_number,status,'/sales/'||id FROM sales WHERE lower(document_number) LIKE ?

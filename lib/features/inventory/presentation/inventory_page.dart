@@ -13,10 +13,10 @@ class InventoryRow {
   const InventoryRow(
     this.productId,
     this.product,
-    this.warehouse,
+    this.unit,
     this.quantityMilli,
   );
-  final String productId, product, warehouse;
+  final String productId, product, unit;
   final int quantityMilli;
 }
 
@@ -24,15 +24,15 @@ class InventoryPage extends ConsumerWidget {
   const InventoryPage({super.key});
   Stream<List<InventoryRow>> rows(AppDatabase db, String company) => db
       .customSelect(
-        '''SELECT p.id,p.name product,w.name warehouse,COALESCE(b.quantity_milli,0) quantity FROM products p CROSS JOIN warehouses w LEFT JOIN inventory_balances b ON b.product_id=p.id AND b.warehouse_id=w.id WHERE p.company_id=? AND w.company_id=? AND p.deleted_at IS NULL ORDER BY p.name''',
-        variables: [Variable(company), Variable(company)],
-        readsFrom: {db.products, db.warehouses, db.inventoryBalances},
+        '''SELECT p.id,p.name product,COALESCE(u.code,'') unit,COALESCE(SUM(b.quantity_milli),0) quantity FROM products p LEFT JOIN units u ON u.id=p.unit_id LEFT JOIN inventory_balances b ON b.product_id=p.id WHERE p.company_id=? AND p.deleted_at IS NULL GROUP BY p.id,p.name,u.code ORDER BY p.name''',
+        variables: [Variable(company)],
+        readsFrom: {db.products, db.units, db.inventoryBalances},
       )
       .map(
         (r) => InventoryRow(
           r.read('id'),
           r.read('product'),
-          r.read('warehouse'),
+          r.read('unit'),
           r.read('quantity'),
         ),
       )
@@ -56,21 +56,6 @@ class InventoryPage extends ConsumerWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: () => context.go('/inventory/lots'),
-                      icon: const Icon(Icons.event_busy_outlined),
-                      label: const LocalizedText('Lotes'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => context.go('/inventory/counts'),
-                      icon: const Icon(Icons.fact_check_outlined),
-                      label: const LocalizedText('Inventário'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => context.go('/inventory/adjustments'),
-                      icon: const Icon(Icons.swap_vert_outlined),
-                      label: const LocalizedText('Movimentos'),
-                    ),
                     FilledButton.icon(
                       onPressed: () => _adjust(context, db),
                       icon: const Icon(Icons.tune),
@@ -94,21 +79,46 @@ class InventoryPage extends ConsumerWidget {
                         ),
                       );
                     }
+                    final total = data.fold<int>(
+                      0,
+                      (sum, row) => sum + row.quantityMilli,
+                    );
                     return ListView.separated(
                       padding: const EdgeInsets.all(16),
-                      itemCount: data.length,
+                      itemCount: data.length + 1,
                       separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (_, i) {
-                        final row = data[i];
+                        if (i == 0) {
+                          return Card(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.primaryContainer,
+                            child: ListTile(
+                              leading: const Icon(Icons.inventory_outlined),
+                              title: const LocalizedText(
+                                'Quantidade geral em stock',
+                              ),
+                              trailing: Text(
+                                _quantity(total),
+                                style: Theme.of(
+                                  context,
+                                ).textTheme.headlineSmall,
+                              ),
+                            ),
+                          );
+                        }
+                        final row = data[i - 1];
                         return Card(
                           child: ListTile(
                             onTap: () => context.go(
                               '/inventory/product/${row.productId}',
                             ),
                             title: Text(row.product),
-                            subtitle: Text(row.warehouse),
+                            subtitle: LocalizedText(
+                              'Stock disponível${row.unit.isEmpty ? '' : ' · ${row.unit}'}',
+                            ),
                             trailing: Text(
-                              (row.quantityMilli / 1000).toStringAsFixed(3),
+                              _quantity(row.quantityMilli),
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                             leading: const Icon(Icons.inventory_2_outlined),
@@ -124,6 +134,13 @@ class InventoryPage extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  String _quantity(int milli) {
+    final value = milli / 1000;
+    return value == value.roundToDouble()
+        ? value.toStringAsFixed(0)
+        : value.toStringAsFixed(3).replaceFirst(RegExp(r'0+$'), '');
   }
 
   Future<void> _adjust(BuildContext context, AppDatabase db) async {

@@ -5,13 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
-import 'package:systock/core/database/document_number_service.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/core/security/permission_gate.dart';
 import 'package:systock/core/widgets/platform_controls.dart';
 import 'package:systock/features/inventory/application/inventory_ledger.dart';
 import 'package:systock/features/products/presentation/product_image.dart';
-import 'package:systock/features/transfers/application/transfer_service.dart';
 
 class InventoryProductPage extends ConsumerStatefulWidget {
   const InventoryProductPage(this.productId, {super.key});
@@ -65,7 +63,7 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
                               style: Theme.of(context).textTheme.titleLarge
                                   ?.copyWith(fontWeight: FontWeight.w700),
                             ),
-                            Text(product.sku ?? 'Sem SKU'),
+                            const LocalizedText('Stock do produto'),
                           ],
                         ),
                       ),
@@ -89,39 +87,21 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
                       icon: const Icon(Icons.tune),
                       label: const LocalizedText('Ajustar stock'),
                     ),
-                    OutlinedButton.icon(
-                      onPressed: () => _transfer(db, product),
-                      icon: const Icon(Icons.swap_horiz),
-                      label: const LocalizedText('Transferir'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => context.go('/inventory/counts'),
-                      icon: const Icon(Icons.fact_check_outlined),
-                      label: const LocalizedText('Contagem física'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: () => context.go('/inventory/lots'),
-                      icon: const Icon(Icons.inventory_outlined),
-                      label: const LocalizedText('Lotes e validade'),
-                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
               LocalizedText(
-                'Saldo por armazém',
+                'Quantidade disponível',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 8),
               StreamBuilder(
                 stream: db
                     .customSelect(
-                      '''SELECT w.id,w.name,COALESCE(b.quantity_milli,0) quantity FROM warehouses w LEFT JOIN inventory_balances b ON b.warehouse_id=w.id AND b.product_id=? WHERE w.company_id=? AND w.deleted_at IS NULL ORDER BY w.name''',
-                      variables: [
-                        Variable(product.id),
-                        Variable(product.companyId),
-                      ],
-                      readsFrom: {db.warehouses, db.inventoryBalances},
+                      '''SELECT COALESCE(SUM(quantity_milli),0) quantity FROM inventory_balances WHERE product_id=?''',
+                      variables: [Variable(product.id)],
+                      readsFrom: {db.inventoryBalances},
                     )
                     .watch(),
                 builder: (_, balances) => Card(
@@ -129,8 +109,8 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
                     children: [
                       for (final row in balances.data ?? const [])
                         ListTile(
-                          leading: const Icon(Icons.warehouse_outlined),
-                          title: Text(row.read<String>('name')),
+                          leading: const Icon(Icons.inventory_2_outlined),
+                          title: const LocalizedText('Stock disponível'),
                           trailing: Text(
                             _quantity(row.read<int>('quantity')),
                             style: const TextStyle(fontWeight: FontWeight.w700),
@@ -168,7 +148,9 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
                                 : Icons.arrow_upward,
                           ),
                           title: Text(_movementLabel(movement.movementType)),
-                          subtitle: Text(movement.reason ?? 'Sem observação'),
+                          subtitle: Text(
+                            '${_date(movement.createdAt)} · ${movement.reason ?? 'Sem observação'}',
+                          ),
                           trailing: LocalizedText(
                             '${movement.quantityMilli >= 0 ? '+' : ''}${_quantity(movement.quantityMilli)}',
                           ),
@@ -182,6 +164,12 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
         );
       },
     );
+  }
+
+  String _date(DateTime value) {
+    final date = value.toLocal();
+    String two(int number) => number.toString().padLeft(2, '0');
+    return '${two(date.day)}/${two(date.month)}/${date.year} ${two(date.hour)}:${two(date.minute)}';
   }
 
   Future<void> _adjust(AppDatabase db, Product product) async {
@@ -310,116 +298,6 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
     });
   }
 
-  Future<void> _transfer(AppDatabase db, Product product) async {
-    final warehouses =
-        await (db.select(db.warehouses)
-              ..where((w) => w.deletedAt.isNull())
-              ..where((w) => w.active.equals(true)))
-            .get();
-    if (!mounted || warehouses.length < 2) {
-      _message('Cadastre pelo menos dois armazéns para transferir stock.');
-      return;
-    }
-    var source = warehouses.first.id, destination = warehouses[1].id;
-    final quantity = TextEditingController(text: '1');
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialog) => StatefulBuilder(
-        builder: (dialog, setDialogState) => AlertDialog(
-          title: LocalizedText('Transferir ${product.name}'),
-          content: SizedBox(
-            width: 440,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _warehouseField(
-                  'Origem',
-                  source,
-                  warehouses,
-                  (value) => setDialogState(() => source = value!),
-                ),
-                const SizedBox(height: 12),
-                _warehouseField(
-                  'Destino',
-                  destination,
-                  warehouses,
-                  (value) => setDialogState(() => destination = value!),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: quantity,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: InputDecoration(
-                    labelText: 'Quantidade'.localized(context),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialog, false),
-              child: const LocalizedText('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: source == destination
-                  ? null
-                  : () => Navigator.pop(dialog, true),
-              child: const LocalizedText('Criar transferência'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (confirmed != true) return;
-    final milli =
-        ((double.tryParse(quantity.text.replaceAll(',', '.')) ?? 0) * 1000)
-            .round();
-    final company = await db.select(db.companies).getSingle();
-    final user =
-        await (db.select(db.users)
-              ..where((u) => u.active.equals(true))
-              ..limit(1))
-            .getSingle();
-    final number = await DocumentNumberService(db).next(
-      companyId: company.id,
-      type: 'transfer',
-      prefix: 'TRF',
-      deviceId: company.deviceId,
-    );
-    final result = await TransferService(db).create(
-      companyId: company.id,
-      sourceWarehouseId: source,
-      destinationWarehouseId: destination,
-      documentNumber: number,
-      userId: user.id,
-      deviceId: company.deviceId,
-      lines: [TransferLine(product.id, milli)],
-    );
-    if (!mounted) return;
-    _message(switch (result) {
-      Success() => 'Transferência criada como rascunho.',
-      Failure(:final error) => error.userMessage,
-    });
-  }
-
-  Widget _warehouseField(
-    String label,
-    String value,
-    List<Warehouse> warehouses,
-    ValueChanged<String?> changed,
-  ) => DropdownButtonFormField<String>(
-    initialValue: value,
-    decoration: InputDecoration(labelText: label),
-    items: [
-      for (final warehouse in warehouses)
-        DropdownMenuItem(value: warehouse.id, child: Text(warehouse.name)),
-    ],
-    onChanged: changed,
-  );
-
   void _message(String value) => ScaffoldMessenger.of(
     context,
   ).showSnackBar(SnackBar(content: Text(value)));
@@ -434,11 +312,10 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
   String _movementLabel(String type) => switch (type) {
     'purchase' => 'Compra',
     'sale' => 'Venda',
-    'adjustment_in' => 'Ajuste de entrada',
-    'adjustment_out' => 'Ajuste de saída',
-    'transfer_in' => 'Transferência recebida',
-    'transfer_out' => 'Transferência expedida',
-    'return' => 'Devolução',
+    'initialStock' => 'Entrada inicial',
+    'adjustmentIn' => 'Entrada de stock',
+    'adjustmentOut' => 'Saída de stock',
+    'returnIn' => 'Devolução',
     _ => type,
   };
 }

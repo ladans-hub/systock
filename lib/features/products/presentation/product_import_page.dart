@@ -50,10 +50,10 @@ class _ProductImportPageState extends ConsumerState<ProductImportPage> {
     if (h.contains('nome') || h.contains('descri')) {
       return ProductImportField.name;
     }
-    if (h == 'sku' || h == 'cod' || h.contains('refer')) {
-      return ProductImportField.sku;
-    }
-    if (h.contains('barra') || h.contains('ean')) {
+    if (h.contains('barra') ||
+        h.contains('ean') ||
+        h == 'codigo' ||
+        h == 'código') {
       return ProductImportField.barcode;
     }
     if (h.contains('custo')) {
@@ -198,7 +198,6 @@ class _ProductImportPageState extends ConsumerState<ProductImportPage> {
   String _label(ProductImportField field) => switch (field) {
     ProductImportField.ignore => 'Ignorar',
     ProductImportField.name => 'Nome',
-    ProductImportField.sku => 'SKU',
     ProductImportField.barcode => 'Código de barras',
     ProductImportField.cost => 'Custo',
     ProductImportField.price => 'Preço',

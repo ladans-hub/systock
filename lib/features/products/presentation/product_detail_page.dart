@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart' show Value, Variable;
+import 'package:drift/drift.dart' show Variable;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -7,7 +7,6 @@ import 'package:go_router/go_router.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
 import 'package:systock/core/security/session_state.dart';
-import 'package:uuid/uuid.dart';
 import 'package:systock/features/products/application/product_catalog.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/features/products/application/product_image_service.dart';
@@ -100,10 +99,6 @@ class ProductDetailPage extends ConsumerWidget {
                   Card(
                     child: Column(
                       children: [
-                        ListTile(
-                          title: const LocalizedText('SKU'),
-                          trailing: Text(d.product.sku ?? '—'),
-                        ),
                         if (d.product.imagePath != null)
                           Padding(
                             padding: const EdgeInsets.all(12),
@@ -115,27 +110,6 @@ class ProductDetailPage extends ConsumerWidget {
                             ),
                           ),
                         ListTile(
-                          title: const LocalizedText('Variantes'),
-                          subtitle: Text(
-                            d.variants.isEmpty
-                                ? 'Produto simples'
-                                : d.variants.map((v) => v.name).join(', '),
-                          ),
-                        ),
-                        ListTile(
-                          title: const LocalizedText('Lotes'),
-                          subtitle: Text(
-                            d.lots.isEmpty
-                                ? 'Sem lotes'
-                                : d.lots
-                                      .map(
-                                        (l) =>
-                                            '${l.batchNumber}${l.expiresAt == null ? '' : ' · ${l.expiresAt!.toLocal()}'}',
-                                      )
-                                      .join('\n'),
-                          ),
-                        ),
-                        ListTile(
                           title: const LocalizedText('Preço de venda'),
                           trailing: Text(formatMoneyMinor(d.product.saleMinor)),
                         ),
@@ -144,9 +118,28 @@ class ProductDetailPage extends ConsumerWidget {
                           trailing: Text(formatMoneyMinor(d.product.costMinor)),
                         ),
                         ListTile(
-                          title: const LocalizedText('Códigos de barras'),
+                          title: const LocalizedText('Código de barras'),
                           subtitle: Text(
                             d.barcodes.map((b) => b.barcode).join(', '),
+                          ),
+                        ),
+                        FutureBuilder<int>(
+                          future: db
+                              .customSelect(
+                                'SELECT COALESCE(SUM(quantity_milli),0) quantity FROM inventory_balances WHERE product_id=?',
+                                variables: [Variable(d.product.id)],
+                                readsFrom: {db.inventoryBalances},
+                              )
+                              .map((row) => row.read<int>('quantity'))
+                              .getSingle(),
+                          builder: (_, stock) => ListTile(
+                            title: const LocalizedText('Quantidade disponível'),
+                            trailing: Text(
+                              ((stock.data ?? 0) / 1000).toStringAsFixed(3),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -157,21 +150,6 @@ class ProductDetailPage extends ConsumerWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      OutlinedButton.icon(
-                        onPressed: () => _addVariant(context, db, d.product),
-                        icon: const Icon(Icons.tune),
-                        label: const LocalizedText('Variante'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => _addBarcode(context, db, d.product),
-                        icon: const Icon(Icons.qr_code),
-                        label: const LocalizedText('Barcode'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => _addSerial(context, db, d.product),
-                        icon: const Icon(Icons.numbers),
-                        label: const LocalizedText('Serial / IMEI'),
-                      ),
                       OutlinedButton.icon(
                         onPressed: () => _addImage(context, db, d.product),
                         icon: const Icon(Icons.image_outlined),
@@ -266,38 +244,6 @@ class ProductDetailPage extends ConsumerWidget {
     },
   );
 
-  Future<void> _addVariant(
-    BuildContext context,
-    AppDatabase db,
-    Product product,
-  ) async {
-    final name = TextEditingController(), sku = TextEditingController();
-    final ok = await _textDialog(context, 'Nova variante', [
-      ('Nome (ex.: 42 / Preto)', name),
-      ('SKU', sku),
-    ]);
-    if (ok != true || name.text.trim().isEmpty) return;
-    final now = DateTime.now().toUtc();
-    await db
-        .into(db.productVariants)
-        .insert(
-          ProductVariantsCompanion.insert(
-            id: const Uuid().v7(),
-            productId: product.id,
-            name: name.text.trim(),
-            sku: Value(sku.text.trim().isEmpty ? null : sku.text.trim()),
-            createdAt: now,
-            updatedAt: now,
-            deviceId: product.deviceId,
-          ),
-        );
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: LocalizedText('Variante adicionada.')),
-      );
-    }
-  }
-
   Future<void> _addImage(
     BuildContext context,
     AppDatabase db,
@@ -355,107 +301,6 @@ class ProductDetailPage extends ConsumerWidget {
         ).showSnackBar(SnackBar(content: Text(error.userMessage)));
     }
   }
-
-  Future<void> _addBarcode(
-    BuildContext context,
-    AppDatabase db,
-    Product product,
-  ) async {
-    final code = TextEditingController();
-    final ok = await _textDialog(context, 'Novo código de barras', [
-      ('Código', code),
-    ]);
-    if (ok != true || code.text.trim().isEmpty) return;
-    final now = DateTime.now().toUtc();
-    try {
-      await db
-          .into(db.productBarcodes)
-          .insert(
-            ProductBarcodesCompanion.insert(
-              id: const Uuid().v7(),
-              productId: product.id,
-              barcode: code.text.trim(),
-              createdAt: now,
-              updatedAt: now,
-              deviceId: product.deviceId,
-            ),
-          );
-    } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: LocalizedText(
-              'Este código de barras já pertence a outro produto.',
-            ),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _addSerial(
-    BuildContext context,
-    AppDatabase db,
-    Product product,
-  ) async {
-    final serial = TextEditingController(), imei = TextEditingController();
-    final warehouses = await db.select(db.warehouses).get();
-    if (!context.mounted || warehouses.isEmpty) return;
-    final ok = await _textDialog(context, 'Novo número de série', [
-      ('Serial', serial),
-      ('IMEI opcional', imei),
-    ]);
-    if (ok != true || serial.text.trim().isEmpty) return;
-    final now = DateTime.now().toUtc();
-    await db
-        .into(db.serialNumbers)
-        .insert(
-          SerialNumbersCompanion.insert(
-            id: const Uuid().v7(),
-            productId: product.id,
-            warehouseId: warehouses.first.id,
-            serial: serial.text.trim(),
-            imei: Value(imei.text.trim().isEmpty ? null : imei.text.trim()),
-            createdAt: now,
-            updatedAt: now,
-            deviceId: product.deviceId,
-          ),
-        );
-  }
-
-  Future<bool?> _textDialog(
-    BuildContext context,
-    String title,
-    List<(String, TextEditingController)> fields,
-  ) => showDialog<bool>(
-    context: context,
-    builder: (dialog) => AlertDialog(
-      title: Text(title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final field in fields)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: TextField(
-                controller: field.$2,
-                decoration: InputDecoration(labelText: field.$1),
-              ),
-            ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(dialog, false),
-          child: const LocalizedText('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(dialog, true),
-          child: const LocalizedText('Salvar'),
-        ),
-      ],
-    ),
-  );
 }
 
 class _ProductStockTab extends StatelessWidget {

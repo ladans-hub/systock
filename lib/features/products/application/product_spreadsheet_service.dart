@@ -6,7 +6,7 @@ import 'package:systock/core/errors/result.dart';
 import 'package:systock/core/utils/money.dart';
 import 'package:uuid/uuid.dart';
 
-enum ProductImportField { ignore, name, sku, barcode, cost, price, stock }
+enum ProductImportField { ignore, name, barcode, cost, price, stock }
 
 class ProductImportPreview {
   const ProductImportPreview(this.headers, this.rows);
@@ -98,7 +98,6 @@ class ProductSpreadsheetService {
                   id: id,
                   companyId: companyId,
                   name: record[ProductImportField.name]!,
-                  sku: Value(_nullable(record[ProductImportField.sku])),
                   costMinor: Value(money(ProductImportField.cost)),
                   saleMinor: Value(money(ProductImportField.price)),
                   createdAt: now,
@@ -156,7 +155,7 @@ class ProductSpreadsheetService {
       return Failure(
         StorageFailure(
           duplicate
-              ? 'A importação contém SKU ou código de barras duplicado.'
+              ? 'A importação contém código de barras duplicado.'
               : 'A importação foi cancelada sem alterar os dados.',
           cause: error,
         ),
@@ -169,7 +168,7 @@ class ProductSpreadsheetService {
       final rows = await _db
           .customSelect(
             '''
-        SELECT p.name, p.sku, p.cost_minor, p.sale_minor,
+        SELECT p.name, p.cost_minor, p.sale_minor,
           (SELECT barcode FROM product_barcodes b WHERE b.product_id=p.id AND b.deleted_at IS NULL ORDER BY primary_barcode DESC LIMIT 1) barcode,
           COALESCE(SUM(ib.quantity_milli), 0) quantity_milli
         FROM products p LEFT JOIN inventory_balances ib ON ib.product_id=p.id
@@ -189,7 +188,6 @@ class ProductSpreadsheetService {
       sheet.appendRow(
         [
           'Nome',
-          'SKU',
           'Código de barras',
           'Custo',
           'Preço',
@@ -199,7 +197,6 @@ class ProductSpreadsheetService {
       for (final row in rows) {
         sheet.appendRow([
           TextCellValue(row.read<String>('name')),
-          TextCellValue(row.readNullable<String>('sku') ?? ''),
           TextCellValue(row.readNullable<String>('barcode') ?? ''),
           TextCellValue(_minorText(row.read<int>('cost_minor'))),
           TextCellValue(_minorText(row.read<int>('sale_minor'))),

@@ -19,13 +19,11 @@ class SalesKpis {
 class StockReportRow {
   const StockReportRow(
     this.name,
-    this.sku,
     this.warehouse,
     this.quantityMilli,
     this.valueMinor,
   );
   final String name, warehouse;
-  final String? sku;
   final int quantityMilli, valueMinor;
 }
 
@@ -293,7 +291,7 @@ class ReportService {
   Future<List<StockReportRow>> stock(String companyId) async {
     final rows = await _db
         .customSelect(
-          '''SELECT p.name,p.sku,w.name warehouse,b.quantity_milli,(b.quantity_milli*p.cost_minor)/1000 value_minor FROM inventory_balances b JOIN products p ON p.id=b.product_id JOIN warehouses w ON w.id=b.warehouse_id WHERE p.company_id=? AND p.deleted_at IS NULL ORDER BY p.name''',
+          '''SELECT p.name,w.name warehouse,b.quantity_milli,(b.quantity_milli*p.cost_minor)/1000 value_minor FROM inventory_balances b JOIN products p ON p.id=b.product_id JOIN warehouses w ON w.id=b.warehouse_id WHERE p.company_id=? AND p.deleted_at IS NULL ORDER BY p.name''',
           variables: [Variable(companyId)],
         )
         .get();
@@ -301,7 +299,6 @@ class ReportService {
       for (final r in rows)
         StockReportRow(
           r.read('name'),
-          r.readNullable('sku'),
           r.read('warehouse'),
           r.read('quantity_milli'),
           r.read('value_minor'),
@@ -310,16 +307,8 @@ class ReportService {
   }
 
   String stockCsv(List<StockReportRow> rows) => Csv.excel().encode([
-    [
-      'Produto',
-      'SKU',
-      'Armazém',
-      'Quantidade (milésimos)',
-      'Valor (menor unidade)',
-    ],
-    ...rows.map(
-      (r) => [r.name, r.sku ?? '', r.warehouse, r.quantityMilli, r.valueMinor],
-    ),
+    ['Produto', 'Armazém', 'Quantidade (milésimos)', 'Valor (menor unidade)'],
+    ...rows.map((r) => [r.name, r.warehouse, r.quantityMilli, r.valueMinor]),
   ]);
 
   List<int> stockXlsx(List<StockReportRow> rows) {
@@ -328,7 +317,6 @@ class ReportService {
     sheet.appendRow(
       [
         'Produto',
-        'SKU',
         'Armazém',
         'Quantidade milésimos',
         'Valor menor unidade',
@@ -337,7 +325,6 @@ class ReportService {
     for (final row in rows) {
       sheet.appendRow([
         TextCellValue(row.name),
-        TextCellValue(row.sku ?? ''),
         TextCellValue(row.warehouse),
         IntCellValue(row.quantityMilli),
         IntCellValue(row.valueMinor),

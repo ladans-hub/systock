@@ -18,11 +18,10 @@ class ProductCatalog {
     final term = '%${query.trim().toLowerCase()}%';
     return _db
         .customSelect(
-          '''SELECT p.* FROM products p WHERE p.company_id=? AND p.deleted_at IS NULL AND (?='' OR lower(p.name) LIKE ? OR lower(COALESCE(p.sku,'')) LIKE ? OR EXISTS(SELECT 1 FROM product_barcodes b WHERE b.product_id=p.id AND b.deleted_at IS NULL AND b.barcode LIKE ?)) ORDER BY p.name COLLATE NOCASE LIMIT ? OFFSET ?''',
+          '''SELECT p.* FROM products p WHERE p.company_id=? AND p.deleted_at IS NULL AND (?='' OR lower(p.name) LIKE ? OR EXISTS(SELECT 1 FROM product_barcodes b WHERE b.product_id=p.id AND b.deleted_at IS NULL AND b.barcode LIKE ?)) ORDER BY p.name COLLATE NOCASE LIMIT ? OFFSET ?''',
           variables: [
             Variable(companyId),
             Variable(query.trim()),
-            Variable(term),
             Variable(term),
             Variable(term),
             Variable(limit),
@@ -52,8 +51,15 @@ class ProductCatalog {
     int maximumStockMilli = 0,
     bool trackStock = true,
     bool allowNegativeStock = false,
+    int initialQuantityMilli = 0,
+    String? warehouseId,
+    String? userId,
   }) async {
-    if (name.trim().isEmpty || costMinor < 0 || saleMinor < 0) {
+    if (name.trim().isEmpty ||
+        costMinor < 0 ||
+        saleMinor < 0 ||
+        initialQuantityMilli < 0 ||
+        (initialQuantityMilli > 0 && (warehouseId == null || userId == null))) {
       return const Failure(
         ValidationFailure('Informe um nome e preços válidos.'),
       );
@@ -101,6 +107,40 @@ class ProductCatalog {
                 ),
               );
         }
+        if (warehouseId != null) {
+          await _db
+              .into(_db.inventoryBalances)
+              .insert(
+                InventoryBalancesCompanion.insert(
+                  productId: id,
+                  warehouseId: warehouseId,
+                  quantityMilli: Value(initialQuantityMilli),
+                  updatedAt: now,
+                ),
+              );
+          if (initialQuantityMilli > 0) {
+            final movementId = _uuid.v7();
+            await _db
+                .into(_db.inventoryMovements)
+                .insert(
+                  InventoryMovementsCompanion.insert(
+                    id: movementId,
+                    companyId: companyId,
+                    productId: id,
+                    warehouseId: warehouseId,
+                    movementType: 'initialStock',
+                    quantityMilli: initialQuantityMilli,
+                    balanceBeforeMilli: 0,
+                    balanceAfterMilli: initialQuantityMilli,
+                    reason: const Value('Entrada no cadastro do produto'),
+                    userId: Value(userId),
+                    createdAt: now,
+                    updatedAt: now,
+                    deviceId: deviceId,
+                  ),
+                );
+          }
+        }
         final payload = jsonEncode({
           'companyId': companyId,
           'name': name.trim(),
@@ -111,6 +151,7 @@ class ProductCatalog {
           'wholesaleMinor': wholesaleMinor,
           'minimumPriceMinor': minimumPriceMinor,
           'minimumStockMilli': minimumStockMilli,
+          'initialQuantityMilli': initialQuantityMilli,
           'createdAt': now.toIso8601String(),
           'updatedAt': now.toIso8601String(),
         });
@@ -136,7 +177,7 @@ class ProductCatalog {
       return Failure(
         StorageFailure(
           duplicate
-              ? 'Já existe um produto com este SKU ou código de barras.'
+              ? 'Este código de barras já pertence a outro produto.'
               : 'Não foi possível salvar o produto.',
           cause: error,
         ),
@@ -392,7 +433,7 @@ class ProductCatalog {
       return Failure(
         StorageFailure(
           error.toString().contains('UNIQUE')
-              ? 'Este SKU ou código de barras já pertence a outro produto.'
+              ? 'Este código de barras já pertence a outro produto.'
               : 'Não foi possível atualizar o produto.',
           cause: error,
         ),

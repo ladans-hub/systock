@@ -148,7 +148,7 @@ class _LabelsPageState extends ConsumerState<LabelsPage> {
     );
     await Printing.layoutPdf(
       onLayout: (_) async => bytes,
-      name: 'etiquetas-${product.sku ?? product.id}',
+      name: 'etiquetas-${barcode.barcode}',
     );
   }
 }
