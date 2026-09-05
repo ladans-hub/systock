@@ -84,7 +84,7 @@ void main() {
         (await migrated.select(migrated.companies).getSingle()).tradeName,
         'Preservar',
       );
-      expect(migrated.schemaVersion, 11);
+      expect(migrated.schemaVersion, 12);
       expect(await migrated.select(migrated.expenses).get(), isEmpty);
       expect(
         await migrated.customSelect('PRAGMA foreign_key_check').get(),

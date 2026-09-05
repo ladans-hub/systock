@@ -5109,7 +5109,6 @@ class $ProductBarcodesTable extends ProductBarcodes
     ),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
   );
   static const VerificationMeta _primaryBarcodeMeta = const VerificationMeta(
     'primaryBarcode',
