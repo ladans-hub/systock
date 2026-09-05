@@ -443,6 +443,20 @@ class _PosPageState extends ConsumerState<PosPage> {
                                         }),
                                         glyph: PlatformGlyph.remove,
                                       ),
+                                      IconButton(
+                                        tooltip: 'Remover item'.localized(
+                                          context,
+                                        ),
+                                        icon: const Icon(Icons.delete_outline),
+                                        onPressed: () {
+                                          setState(
+                                            () => cart.remove(e.product.id),
+                                          );
+                                          unawaited(
+                                            _saveCart('pos.active_cart'),
+                                          );
+                                        },
+                                      ),
                                     ],
                                   ),
                                 ),

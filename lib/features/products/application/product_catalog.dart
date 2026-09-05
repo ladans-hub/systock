@@ -503,7 +503,9 @@ class ProductCatalog {
           )..where((b) => b.id.equals(existing.id))).write(
             ProductBarcodesCompanion(
               barcode: Value(cleanBarcode),
-              expiresAt: Value(expiresAt),
+              expiresAt: expiresAt == null
+                  ? const Value.absent()
+                  : Value(expiresAt),
               deletedAt: const Value(null),
               updatedAt: Value(now),
               version: Value(existing.version + 1),

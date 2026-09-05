@@ -85,7 +85,6 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   final barcode = TextEditingController();
   final location = TextEditingController();
   final shelf = TextEditingController();
-  DateTime? expiresAt;
   String? categoryId, brandId, unitId, selectedImage;
   bool loading = true, saving = false;
 
@@ -118,7 +117,6 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     name.text = loaded.name;
     description.text = loaded.description ?? '';
     barcode.text = primaryBarcode?.barcode ?? '';
-    expiresAt = primaryBarcode?.expiresAt;
     location.text = loaded.location ?? '';
     shelf.text = loaded.shelf ?? '';
     categoryId = loaded.categoryId;
@@ -159,7 +157,6 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       allowNegativeStock: current.allowNegativeStock,
       active: current.active,
       barcode: barcode.text,
-      expiresAt: expiresAt,
     );
     if (result case Success()) {
       if (selectedImage != null) {
@@ -296,29 +293,6 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
             children: [
               _field(name, 'Nome *'),
               _field(description, 'Descrição', lines: 3),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const LocalizedText('Validade'),
-                subtitle: Text(
-                  expiresAt == null
-                      ? 'Não definida'.localized(context)
-                      : '${expiresAt!.day.toString().padLeft(2, '0')}/${expiresAt!.month.toString().padLeft(2, '0')}/${expiresAt!.year}',
-                ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.calendar_month_outlined),
-                  onPressed: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                      initialDate: expiresAt ?? DateTime.now(),
-                    );
-                    if (picked != null) {
-                      setState(() => expiresAt = picked.toUtc());
-                    }
-                  },
-                ),
-              ),
               _dropdown(
                 'Categoria',
                 categoryId,

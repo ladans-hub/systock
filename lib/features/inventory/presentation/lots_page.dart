@@ -99,7 +99,7 @@ class LotsPage extends ConsumerWidget {
               TextField(
                 controller: number,
                 decoration: InputDecoration(
-                  labelText: 'Número do lote'.localized(context),
+                  labelText: 'Código de barras'.localized(context),
                 ),
               ),
               TextField(

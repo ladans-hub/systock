@@ -747,7 +747,7 @@ class AppDatabase extends _$AppDatabase {
     ),
   );
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -874,6 +874,23 @@ class AppDatabase extends _$AppDatabase {
         if (!columns.any((row) => row.read<String>('name') == 'expires_at')) {
           await m.addColumn(productBarcodes, productBarcodes.expiresAt);
         }
+      }
+      if (from < 14) {
+        await customStatement('''
+          INSERT INTO lots (id, product_id, warehouse_id, batch_number, expires_at,
+                            created_at, updated_at, version, device_id)
+          SELECT lower(hex(randomblob(16))), p.id, w.id, b.barcode, b.expires_at,
+                 b.created_at, b.updated_at, 1, b.device_id
+            FROM product_barcodes b
+            JOIN products p ON p.id = b.product_id
+            JOIN warehouses w ON w.company_id = p.company_id AND w.active = 1
+           WHERE b.deleted_at IS NULL
+             AND NOT EXISTS (
+               SELECT 1 FROM lots l
+                WHERE l.product_id = b.product_id AND l.batch_number = b.barcode
+             )
+           GROUP BY b.id
+        ''');
       }
     },
     beforeOpen: (details) async {

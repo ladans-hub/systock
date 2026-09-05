@@ -153,6 +153,9 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
                             movement.quantityMilli >= 0
                                 ? Icons.arrow_downward
                                 : Icons.arrow_upward,
+                            color: movement.quantityMilli >= 0
+                                ? Colors.green
+                                : Colors.red,
                           ),
                           title: Text(_movementLabel(movement.movementType)),
                           subtitle: Text(
@@ -160,6 +163,12 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
                           ),
                           trailing: LocalizedText(
                             '${movement.quantityMilli >= 0 ? '+' : ''}${_quantity(movement.quantityMilli)}',
+                            style: TextStyle(
+                              color: movement.quantityMilli >= 0
+                                  ? Colors.green
+                                  : Colors.red,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                     ],
