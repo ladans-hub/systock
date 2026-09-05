@@ -231,6 +231,11 @@ class ProductCatalog {
       final code = await (_db.select(
         _db.productBarcodes,
       )..where((b) => b.barcode.equals(barcode.trim()))).getSingleOrNull();
+      if (code != null && code.productId != productId) {
+        return const Failure(
+          ValidationFailure('Este código está associado a outro produto.'),
+        );
+      }
       if (code == null) {
         final now = DateTime.now().toUtc();
         await _db
