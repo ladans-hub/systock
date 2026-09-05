@@ -184,15 +184,19 @@ Future<void> ensureDefaultSeller(
           .getSingleOrNull();
   final uuid = const Uuid(), now = DateTime.now().toUtc();
   await db.transaction(() async {
-    await db
-        .into(db.permissions)
-        .insert(
-          PermissionsCompanion.insert(
-            code: 'sales.create',
-            description: 'Acessar e vender no Ponto de Venda',
-          ),
-          mode: InsertMode.insertOrIgnore,
-        );
+    for (final permission in _adminPermissions) {
+      await db
+          .into(db.permissions)
+          .insert(
+            PermissionsCompanion.insert(
+              code: permission,
+              description: permission == 'sales.create'
+                  ? 'Acessar e vender no Ponto de Venda'
+                  : permission,
+            ),
+            mode: InsertMode.insertOrIgnore,
+          );
+    }
     if (sellerRole == null) {
       final roleId = uuid.v7();
       await db
@@ -212,15 +216,17 @@ Future<void> ensureDefaultSeller(
         db.roles,
       )..where((r) => r.id.equals(roleId))).getSingle();
     }
-    await db
-        .into(db.rolePermissions)
-        .insert(
-          RolePermissionsCompanion.insert(
-            roleId: sellerRole!.id,
-            permissionCode: 'sales.create',
-          ),
-          mode: InsertMode.insertOrIgnore,
-        );
+    for (final permission in _adminPermissions) {
+      await db
+          .into(db.rolePermissions)
+          .insert(
+            RolePermissionsCompanion.insert(
+              roleId: sellerRole!.id,
+              permissionCode: permission,
+            ),
+            mode: InsertMode.insertOrIgnore,
+          );
+    }
     final roleUser = await (db.select(
       db.users,
     )..where((u) => u.roleId.equals(sellerRole!.id))).getSingleOrNull();

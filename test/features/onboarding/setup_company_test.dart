@@ -34,7 +34,7 @@ void main() {
     expect(await db.select(db.companies).get(), isEmpty);
   });
 
-  test('creates one idempotent POS-only seller login', () async {
+  test('creates one idempotent seller login with full access', () async {
     await SetupCompany(db)(
       tradeName: 'Loja Maputo',
       adminName: 'Ana',
@@ -57,6 +57,28 @@ void main() {
     expect(sellerUsers, hasLength(1));
     expect(sellerUsers.single.username, 'vendedor');
     expect(sellerUsers.single.pinHash, isNotNull);
-    expect(permissions.map((item) => item.permissionCode), ['sales.create']);
+    expect(
+      permissions.map((item) => item.permissionCode),
+      containsAll(_expectedSellerPermissions),
+    );
   });
 }
+
+const _expectedSellerPermissions = [
+  'products.view',
+  'products.create',
+  'products.update',
+  'products.delete',
+  'inventory.view',
+  'inventory.adjust',
+  'sales.create',
+  'sales.cancel',
+  'sales.discount',
+  'purchases.create',
+  'purchases.approve',
+  'reports.view',
+  'reports.export',
+  'users.manage',
+  'settings.manage',
+  'backup.manage',
+];
