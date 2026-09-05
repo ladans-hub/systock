@@ -35,7 +35,7 @@ class _BarcodeExpiryTileState extends State<_BarcodeExpiryTile> {
       initialDate: expiresAt ?? DateTime.now(),
     );
     if (picked == null) return;
-    final value = picked.toUtc();
+    final value = DateTime.utc(picked.year, picked.month, picked.day);
     await (widget.db.update(widget.db.productBarcodes)
           ..where((b) => b.id.equals(widget.barcode.id)))
         .write(ProductBarcodesCompanion(expiresAt: Value(value)));

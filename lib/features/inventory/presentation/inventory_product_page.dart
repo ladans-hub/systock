@@ -354,7 +354,13 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
                       initialDate: expiresAt ?? DateTime.now(),
                     );
                     if (picked != null) {
-                      setState(() => expiresAt = picked.toUtc());
+                      setState(
+                        () => expiresAt = DateTime.utc(
+                          picked.year,
+                          picked.month,
+                          picked.day,
+                        ),
+                      );
                     }
                   },
                 ),

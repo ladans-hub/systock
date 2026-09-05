@@ -134,11 +134,22 @@ class LotsPage extends ConsumerWidget {
             productId: product.id,
             warehouseId: warehouse.id,
             batchNumber: number.text.trim(),
-            expiresAt: Value(DateTime.tryParse(expiry.text)?.toUtc()),
+            expiresAt: Value(_parseDateOnly(expiry.text)),
             createdAt: now,
             updatedAt: now,
             deviceId: company.deviceId,
           ),
         );
+  }
+
+  DateTime? _parseDateOnly(String value) {
+    final parts = value.trim().split('-');
+    if (parts.length != 3) return null;
+    final year = int.tryParse(parts[0]),
+        month = int.tryParse(parts[1]),
+        day = int.tryParse(parts[2]);
+    return year == null || month == null || day == null
+        ? null
+        : DateTime.utc(year, month, day);
   }
 }

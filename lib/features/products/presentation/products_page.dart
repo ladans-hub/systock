@@ -623,7 +623,13 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                           initialDate: expiresAt ?? DateTime.now(),
                         );
                         if (picked != null) {
-                          setDialogState(() => expiresAt = picked.toUtc());
+                          setDialogState(
+                            () => expiresAt = DateTime.utc(
+                              picked.year,
+                              picked.month,
+                              picked.day,
+                            ),
+                          );
                         }
                       },
                     ),
