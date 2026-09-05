@@ -159,6 +159,7 @@ const _adminPermissions = [
   'settings.manage',
   'backup.manage',
 ];
+const _sellerResetPermission = 'users.reset_admin_pin';
 
 /// Adds the standard POS-only login to databases created by older versions.
 Future<void> ensureDefaultSeller(
@@ -184,7 +185,7 @@ Future<void> ensureDefaultSeller(
           .getSingleOrNull();
   final uuid = const Uuid(), now = DateTime.now().toUtc();
   await db.transaction(() async {
-    for (final permission in _adminPermissions) {
+    for (final permission in [..._adminPermissions, _sellerResetPermission]) {
       await db
           .into(db.permissions)
           .insert(
@@ -216,7 +217,10 @@ Future<void> ensureDefaultSeller(
         db.roles,
       )..where((r) => r.id.equals(roleId))).getSingle();
     }
-    for (final permission in _adminPermissions) {
+    await db.customStatement(
+      "DELETE FROM role_permissions WHERE role_id = '${sellerRole!.id}' AND permission_code <> 'sales.create'",
+    );
+    for (final permission in ['sales.create', _sellerResetPermission]) {
       await db
           .into(db.rolePermissions)
           .insert(

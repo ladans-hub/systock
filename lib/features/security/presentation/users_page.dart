@@ -7,6 +7,7 @@ import 'package:systock/core/database/database_provider.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/features/security/application/user_admin_service.dart';
 import 'package:systock/core/widgets/platform_controls.dart';
+import 'package:systock/core/security/permission_gate.dart';
 
 class UsersPage extends ConsumerWidget {
   const UsersPage({super.key});
@@ -14,23 +15,32 @@ class UsersPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final db = ref.watch(databaseProvider);
+    final full =
+        ref
+            .watch(activePermissionsProvider)
+            .valueOrNull
+            ?.contains('users.manage') ==
+        true;
     return Scaffold(
       appBar: AppBar(
         leading: const AdaptiveBackButton(),
         title: const LocalizedText('Utilizadores e permissões'),
         actions: [
-          TextButton.icon(
-            onPressed: () => _createRole(context, db),
-            icon: const Icon(Icons.admin_panel_settings_outlined),
-            label: const LocalizedText('Novo perfil'),
-          ),
+          if (full)
+            TextButton.icon(
+              onPressed: () => _createRole(context, db),
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+              label: const LocalizedText('Novo perfil'),
+            ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _create(context, db),
-        icon: const Icon(Icons.person_add),
-        label: const LocalizedText('Adicionar'),
-      ),
+      floatingActionButton: full
+          ? FloatingActionButton.extended(
+              onPressed: () => _create(context, db),
+              icon: const Icon(Icons.person_add),
+              label: const LocalizedText('Adicionar'),
+            )
+          : null,
       body: StreamBuilder<List<User>>(
         stream: db.select(db.users).watch(),
         builder: (context, snapshot) {
@@ -59,16 +69,20 @@ class UsersPage extends ConsumerWidget {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                        onPressed: () => _changePin(context, db, user),
-                        icon: const Icon(Icons.password_outlined),
-                        tooltip: 'Alterar PIN'.localized(context),
-                      ),
-                      Switch(
-                        value: user.active,
-                        onChanged: (value) =>
-                            UserAdminService(db).setActive(user.id, value),
-                      ),
+                      if (full ||
+                          (role.data?.name.toLowerCase().contains('admin') ==
+                              true))
+                        IconButton(
+                          onPressed: () => _changePin(context, db, user),
+                          icon: const Icon(Icons.password_outlined),
+                          tooltip: 'Alterar PIN'.localized(context),
+                        ),
+                      if (full)
+                        Switch(
+                          value: user.active,
+                          onChanged: (value) =>
+                              UserAdminService(db).setActive(user.id, value),
+                        ),
                     ],
                   ),
                 ),

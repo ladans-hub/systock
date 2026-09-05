@@ -201,8 +201,8 @@ final appRouter = GoRouter(
         GoRoute(path: '/expenses', builder: (_, _) => const ExpensesPage()),
         GoRoute(
           path: '/settings/users',
-          builder: (_, _) => const PermissionGate(
-            permission: 'users.manage',
+          builder: (_, _) => const AnyPermissionGate(
+            permissions: ['users.manage', 'users.reset_admin_pin'],
             child: UsersPage(),
           ),
         ),

@@ -41,6 +41,27 @@ class PermissionGate extends ConsumerWidget {
       );
 }
 
+class AnyPermissionGate extends ConsumerWidget {
+  const AnyPermissionGate({
+    required this.permissions,
+    required this.child,
+    super.key,
+  });
+  final List<String> permissions;
+  final Widget child;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => ref
+      .watch(activePermissionsProvider)
+      .when(
+        loading: () =>
+            const Scaffold(body: Center(child: CircularProgressIndicator())),
+        error: (_, _) => _Denied(onBack: () => context.go('/dashboard')),
+        data: (value) => permissions.any(value.contains)
+            ? child
+            : _Denied(onBack: () => context.go('/dashboard')),
+      );
+}
+
 class PermissionBuilder extends ConsumerWidget {
   const PermissionBuilder({
     required this.permission,
