@@ -66,31 +66,34 @@ void main() {
     expect(movement.movementType, 'initialStock');
     expect(movement.quantityMilli, 22000);
   });
-  test('shared barcode can be associated with multiple products', () async {
-    final db = AppDatabase(NativeDatabase.memory());
-    addTearDown(db.close);
-    final company =
-        (await SetupCompany(db)(
-                  tradeName: 'Loja',
-                  adminName: 'Admin',
-                  username: 'admin',
-                )
-                as Success<String>)
-            .value;
-    final catalog = ProductCatalog(db);
-    await catalog.create(
-      companyId: company,
-      deviceId: 'd',
-      name: 'A',
-      barcode: '12345678',
-    );
-    final result = await catalog.create(
-      companyId: company,
-      deviceId: 'd',
-      name: 'B',
-      barcode: '12345678',
-    );
-    expect(result, isA<Success<String>>());
-    expect(await db.select(db.products).get(), hasLength(2));
-  });
+  test(
+    'duplicate barcode returns human-safe failure and rolls back product',
+    () async {
+      final db = AppDatabase(NativeDatabase.memory());
+      addTearDown(db.close);
+      final company =
+          (await SetupCompany(db)(
+                    tradeName: 'Loja',
+                    adminName: 'Admin',
+                    username: 'admin',
+                  )
+                  as Success<String>)
+              .value;
+      final catalog = ProductCatalog(db);
+      await catalog.create(
+        companyId: company,
+        deviceId: 'd',
+        name: 'A',
+        barcode: '12345678',
+      );
+      final result = await catalog.create(
+        companyId: company,
+        deviceId: 'd',
+        name: 'B',
+        barcode: '12345678',
+      );
+      expect(result, isA<Failure<String>>());
+      expect(await db.select(db.products).get(), hasLength(1));
+    },
+  );
 }

@@ -173,8 +173,14 @@ class ProductCatalog {
       });
       return Success(id);
     } catch (error) {
+      final duplicate = error.toString().contains('UNIQUE');
       return Failure(
-        StorageFailure('Não foi possível salvar o produto.', cause: error),
+        StorageFailure(
+          duplicate
+              ? 'Este código de barras já pertence a outro produto.'
+              : 'Não foi possível salvar o produto.',
+          cause: error,
+        ),
       );
     }
   }
@@ -425,7 +431,12 @@ class ProductCatalog {
       return const Success(null);
     } catch (error) {
       return Failure(
-        StorageFailure('Não foi possível atualizar o produto.', cause: error),
+        StorageFailure(
+          error.toString().contains('UNIQUE')
+              ? 'Este código de barras já pertence a outro produto.'
+              : 'Não foi possível atualizar o produto.',
+          cause: error,
+        ),
       );
     }
   }
