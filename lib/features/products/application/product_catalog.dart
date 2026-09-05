@@ -3,6 +3,7 @@ import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/errors/result.dart';
+import 'package:systock/features/inventory/application/inventory_ledger.dart';
 import 'package:uuid/uuid.dart';
 
 class ProductCatalog {
@@ -64,6 +65,32 @@ class ProductCatalog {
         ValidationFailure('Informe um nome e preços válidos.'),
       );
     }
+    final existingBarcode = barcode?.trim().isEmpty ?? true
+        ? null
+        : await (_db.select(_db.productBarcodes)
+                ..where((b) => b.barcode.equals(barcode!.trim()))
+                ..where((b) => b.deletedAt.isNull()))
+              .getSingleOrNull();
+    if (existingBarcode != null) {
+      if (warehouseId == null || userId == null) {
+        return const Failure(
+          ValidationFailure('Informe o armazém e utilizador da entrada.'),
+        );
+      }
+      final entry = await addStockEntry(
+        companyId: companyId,
+        productId: existingBarcode.productId,
+        barcode: existingBarcode.barcode,
+        quantityMilli: initialQuantityMilli,
+        warehouseId: warehouseId,
+        deviceId: deviceId,
+        userId: userId,
+      );
+      return switch (entry) {
+        Success() => Success(existingBarcode.productId),
+        Failure(:final error) => Failure(error),
+      };
+    }
     final id = _uuid.v7(), now = DateTime.now().toUtc();
     try {
       await _db.transaction(() async {
@@ -100,6 +127,7 @@ class ProductCatalog {
                   id: _uuid.v7(),
                   productId: id,
                   barcode: barcode.trim(),
+                  quantityMilli: Value(initialQuantityMilli),
                   primaryBarcode: const Value(true),
                   createdAt: now,
                   updatedAt: now,
@@ -181,6 +209,69 @@ class ProductCatalog {
               : 'Não foi possível salvar o produto.',
           cause: error,
         ),
+      );
+    }
+  }
+
+  Future<Result<void>> addStockEntry({
+    required String companyId,
+    required String productId,
+    required String barcode,
+    required int quantityMilli,
+    required String warehouseId,
+    required String deviceId,
+    required String userId,
+  }) async {
+    if (quantityMilli <= 0 || barcode.trim().isEmpty) {
+      return const Failure(
+        ValidationFailure('Informe código e quantidade válidos.'),
+      );
+    }
+    try {
+      final code = await (_db.select(
+        _db.productBarcodes,
+      )..where((b) => b.barcode.equals(barcode.trim()))).getSingleOrNull();
+      if (code == null) {
+        final now = DateTime.now().toUtc();
+        await _db
+            .into(_db.productBarcodes)
+            .insert(
+              ProductBarcodesCompanion.insert(
+                id: _uuid.v7(),
+                productId: productId,
+                barcode: barcode.trim(),
+                quantityMilli: Value(quantityMilli),
+                primaryBarcode: const Value(false),
+                createdAt: now,
+                updatedAt: now,
+                deviceId: deviceId,
+              ),
+            );
+      }
+      final moved = await InventoryLedger(_db).move(
+        companyId: companyId,
+        productId: productId,
+        warehouseId: warehouseId,
+        quantityMilli: quantityMilli,
+        type: InventoryMovementType.adjustmentIn,
+        deviceId: deviceId,
+        userId: userId,
+        reason: 'Entrada de stock · código ${barcode.trim()}',
+      );
+      if (moved is Failure<int>) return Failure(moved.error);
+      if (code != null) {
+        await (_db.update(
+          _db.productBarcodes,
+        )..where((b) => b.id.equals(code.id))).write(
+          ProductBarcodesCompanion(
+            quantityMilli: Value(code.quantityMilli + quantityMilli),
+          ),
+        );
+      }
+      return const Success(null);
+    } catch (error) {
+      return Failure(
+        StorageFailure('Não foi possível registrar a entrada.', cause: error),
       );
     }
   }

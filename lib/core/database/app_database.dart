@@ -75,6 +75,7 @@ class Products extends SyncEntityTable {
 class ProductBarcodes extends SyncEntityTable {
   TextColumn get productId => text().references(Products, #id)();
   TextColumn get barcode => text().withLength(min: 4, max: 128).unique()();
+  IntColumn get quantityMilli => integer().withDefault(const Constant(0))();
   BoolColumn get primaryBarcode =>
       boolean().withDefault(const Constant(false))();
 }
@@ -745,7 +746,7 @@ class AppDatabase extends _$AppDatabase {
     ),
   );
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -854,6 +855,16 @@ class AppDatabase extends _$AppDatabase {
       // definition in the v6 migration, so archived_at already exists there.
       if (from >= 6 && from < 11) {
         await m.addColumn(notifications, notifications.archivedAt);
+      }
+      if (from < 12) {
+        final columns = await customSelect(
+          'PRAGMA table_info(product_barcodes)',
+        ).get();
+        if (!columns.any(
+          (row) => row.read<String>('name') == 'quantity_milli',
+        )) {
+          await m.addColumn(productBarcodes, productBarcodes.quantityMilli);
+        }
       }
     },
     beforeOpen: (details) async {

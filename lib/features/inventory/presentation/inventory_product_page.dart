@@ -7,9 +7,11 @@ import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/core/security/permission_gate.dart';
+import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/widgets/platform_controls.dart';
 import 'package:systock/features/inventory/application/inventory_ledger.dart';
 import 'package:systock/features/products/presentation/product_image.dart';
+import 'package:systock/features/products/application/product_catalog.dart';
 
 class InventoryProductPage extends ConsumerStatefulWidget {
   const InventoryProductPage(this.productId, {super.key});
@@ -82,6 +84,11 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
                   spacing: 10,
                   runSpacing: 10,
                   children: [
+                    FilledButton.icon(
+                      onPressed: () => _addEntry(db, product),
+                      icon: const Icon(Icons.add_box_outlined),
+                      label: const LocalizedText('Adicionar entrada'),
+                    ),
                     FilledButton.icon(
                       onPressed: () => _adjust(db, product),
                       icon: const Icon(Icons.tune),
@@ -294,6 +301,66 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
     if (!mounted) return;
     _message(switch (result) {
       Success() => 'Stock atualizado com movimento auditável.',
+      Failure(:final error) => error.userMessage,
+    });
+  }
+
+  Future<void> _addEntry(AppDatabase db, Product product) async {
+    final code = TextEditingController(), quantity = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const LocalizedText('Adicionar entrada de stock'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: code,
+              decoration: const InputDecoration(labelText: 'Código de barras'),
+            ),
+            TextField(
+              controller: quantity,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(labelText: 'Quantidade'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const LocalizedText('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const LocalizedText('Adicionar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final parsed = double.tryParse(quantity.text.replaceAll(',', '.'));
+    if (parsed == null || parsed <= 0) return;
+    final user = await currentSessionUser(db);
+    final warehouse =
+        await (db.select(db.warehouses)
+              ..where((w) => w.companyId.equals(product.companyId))
+              ..where((w) => w.active.equals(true))
+              ..limit(1))
+            .getSingle();
+    final result = await ProductCatalog(db).addStockEntry(
+      companyId: product.companyId,
+      productId: product.id,
+      barcode: code.text,
+      quantityMilli: (parsed * 1000).round(),
+      warehouseId: warehouse.id,
+      deviceId: product.deviceId,
+      userId: user.id,
+    );
+    if (!mounted) return;
+    _message(switch (result) {
+      Success() => 'Entrada adicionada.',
       Failure(:final error) => error.userMessage,
     });
   }

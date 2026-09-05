@@ -5111,6 +5111,18 @@ class $ProductBarcodesTable extends ProductBarcodes
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
   );
+  static const VerificationMeta _quantityMilliMeta = const VerificationMeta(
+    'quantityMilli',
+  );
+  @override
+  late final GeneratedColumn<int> quantityMilli = GeneratedColumn<int>(
+    'quantity_milli',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   static const VerificationMeta _primaryBarcodeMeta = const VerificationMeta(
     'primaryBarcode',
   );
@@ -5136,6 +5148,7 @@ class $ProductBarcodesTable extends ProductBarcodes
     deviceId,
     productId,
     barcode,
+    quantityMilli,
     primaryBarcode,
   ];
   @override
@@ -5207,6 +5220,15 @@ class $ProductBarcodesTable extends ProductBarcodes
     } else if (isInserting) {
       context.missing(_barcodeMeta);
     }
+    if (data.containsKey('quantity_milli')) {
+      context.handle(
+        _quantityMilliMeta,
+        quantityMilli.isAcceptableOrUnknown(
+          data['quantity_milli']!,
+          _quantityMilliMeta,
+        ),
+      );
+    }
     if (data.containsKey('primary_barcode')) {
       context.handle(
         _primaryBarcodeMeta,
@@ -5257,6 +5279,10 @@ class $ProductBarcodesTable extends ProductBarcodes
         DriftSqlType.string,
         data['${effectivePrefix}barcode'],
       )!,
+      quantityMilli: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}quantity_milli'],
+      )!,
       primaryBarcode: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}primary_barcode'],
@@ -5279,6 +5305,7 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
   final String deviceId;
   final String productId;
   final String barcode;
+  final int quantityMilli;
   final bool primaryBarcode;
   const ProductBarcode({
     required this.id,
@@ -5289,6 +5316,7 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
     required this.deviceId,
     required this.productId,
     required this.barcode,
+    required this.quantityMilli,
     required this.primaryBarcode,
   });
   @override
@@ -5304,6 +5332,7 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
     map['device_id'] = Variable<String>(deviceId);
     map['product_id'] = Variable<String>(productId);
     map['barcode'] = Variable<String>(barcode);
+    map['quantity_milli'] = Variable<int>(quantityMilli);
     map['primary_barcode'] = Variable<bool>(primaryBarcode);
     return map;
   }
@@ -5320,6 +5349,7 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
       deviceId: Value(deviceId),
       productId: Value(productId),
       barcode: Value(barcode),
+      quantityMilli: Value(quantityMilli),
       primaryBarcode: Value(primaryBarcode),
     );
   }
@@ -5338,6 +5368,7 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
       deviceId: serializer.fromJson<String>(json['deviceId']),
       productId: serializer.fromJson<String>(json['productId']),
       barcode: serializer.fromJson<String>(json['barcode']),
+      quantityMilli: serializer.fromJson<int>(json['quantityMilli']),
       primaryBarcode: serializer.fromJson<bool>(json['primaryBarcode']),
     );
   }
@@ -5353,6 +5384,7 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
       'deviceId': serializer.toJson<String>(deviceId),
       'productId': serializer.toJson<String>(productId),
       'barcode': serializer.toJson<String>(barcode),
+      'quantityMilli': serializer.toJson<int>(quantityMilli),
       'primaryBarcode': serializer.toJson<bool>(primaryBarcode),
     };
   }
@@ -5366,6 +5398,7 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
     String? deviceId,
     String? productId,
     String? barcode,
+    int? quantityMilli,
     bool? primaryBarcode,
   }) => ProductBarcode(
     id: id ?? this.id,
@@ -5376,6 +5409,7 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
     deviceId: deviceId ?? this.deviceId,
     productId: productId ?? this.productId,
     barcode: barcode ?? this.barcode,
+    quantityMilli: quantityMilli ?? this.quantityMilli,
     primaryBarcode: primaryBarcode ?? this.primaryBarcode,
   );
   ProductBarcode copyWithCompanion(ProductBarcodesCompanion data) {
@@ -5388,6 +5422,9 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
       deviceId: data.deviceId.present ? data.deviceId.value : this.deviceId,
       productId: data.productId.present ? data.productId.value : this.productId,
       barcode: data.barcode.present ? data.barcode.value : this.barcode,
+      quantityMilli: data.quantityMilli.present
+          ? data.quantityMilli.value
+          : this.quantityMilli,
       primaryBarcode: data.primaryBarcode.present
           ? data.primaryBarcode.value
           : this.primaryBarcode,
@@ -5405,6 +5442,7 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
           ..write('deviceId: $deviceId, ')
           ..write('productId: $productId, ')
           ..write('barcode: $barcode, ')
+          ..write('quantityMilli: $quantityMilli, ')
           ..write('primaryBarcode: $primaryBarcode')
           ..write(')'))
         .toString();
@@ -5420,6 +5458,7 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
     deviceId,
     productId,
     barcode,
+    quantityMilli,
     primaryBarcode,
   );
   @override
@@ -5434,6 +5473,7 @@ class ProductBarcode extends DataClass implements Insertable<ProductBarcode> {
           other.deviceId == this.deviceId &&
           other.productId == this.productId &&
           other.barcode == this.barcode &&
+          other.quantityMilli == this.quantityMilli &&
           other.primaryBarcode == this.primaryBarcode);
 }
 
@@ -5446,6 +5486,7 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
   final Value<String> deviceId;
   final Value<String> productId;
   final Value<String> barcode;
+  final Value<int> quantityMilli;
   final Value<bool> primaryBarcode;
   final Value<int> rowid;
   const ProductBarcodesCompanion({
@@ -5457,6 +5498,7 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
     this.deviceId = const Value.absent(),
     this.productId = const Value.absent(),
     this.barcode = const Value.absent(),
+    this.quantityMilli = const Value.absent(),
     this.primaryBarcode = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -5469,6 +5511,7 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
     required String deviceId,
     required String productId,
     required String barcode,
+    this.quantityMilli = const Value.absent(),
     this.primaryBarcode = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -5486,6 +5529,7 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
     Expression<String>? deviceId,
     Expression<String>? productId,
     Expression<String>? barcode,
+    Expression<int>? quantityMilli,
     Expression<bool>? primaryBarcode,
     Expression<int>? rowid,
   }) {
@@ -5498,6 +5542,7 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
       if (deviceId != null) 'device_id': deviceId,
       if (productId != null) 'product_id': productId,
       if (barcode != null) 'barcode': barcode,
+      if (quantityMilli != null) 'quantity_milli': quantityMilli,
       if (primaryBarcode != null) 'primary_barcode': primaryBarcode,
       if (rowid != null) 'rowid': rowid,
     });
@@ -5512,6 +5557,7 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
     Value<String>? deviceId,
     Value<String>? productId,
     Value<String>? barcode,
+    Value<int>? quantityMilli,
     Value<bool>? primaryBarcode,
     Value<int>? rowid,
   }) {
@@ -5524,6 +5570,7 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
       deviceId: deviceId ?? this.deviceId,
       productId: productId ?? this.productId,
       barcode: barcode ?? this.barcode,
+      quantityMilli: quantityMilli ?? this.quantityMilli,
       primaryBarcode: primaryBarcode ?? this.primaryBarcode,
       rowid: rowid ?? this.rowid,
     );
@@ -5556,6 +5603,9 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
     if (barcode.present) {
       map['barcode'] = Variable<String>(barcode.value);
     }
+    if (quantityMilli.present) {
+      map['quantity_milli'] = Variable<int>(quantityMilli.value);
+    }
     if (primaryBarcode.present) {
       map['primary_barcode'] = Variable<bool>(primaryBarcode.value);
     }
@@ -5576,6 +5626,7 @@ class ProductBarcodesCompanion extends UpdateCompanion<ProductBarcode> {
           ..write('deviceId: $deviceId, ')
           ..write('productId: $productId, ')
           ..write('barcode: $barcode, ')
+          ..write('quantityMilli: $quantityMilli, ')
           ..write('primaryBarcode: $primaryBarcode, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -43541,6 +43592,7 @@ typedef $$ProductBarcodesTableCreateCompanionBuilder =
       required String deviceId,
       required String productId,
       required String barcode,
+      Value<int> quantityMilli,
       Value<bool> primaryBarcode,
       Value<int> rowid,
     });
@@ -43554,6 +43606,7 @@ typedef $$ProductBarcodesTableUpdateCompanionBuilder =
       Value<String> deviceId,
       Value<String> productId,
       Value<String> barcode,
+      Value<int> quantityMilli,
       Value<bool> primaryBarcode,
       Value<int> rowid,
     });
@@ -43626,6 +43679,11 @@ class $$ProductBarcodesTableFilterComposer
 
   ColumnFilters<String> get barcode => $composableBuilder(
     column: $table.barcode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get quantityMilli => $composableBuilder(
+    column: $table.quantityMilli,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -43702,6 +43760,11 @@ class $$ProductBarcodesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get quantityMilli => $composableBuilder(
+    column: $table.quantityMilli,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get primaryBarcode => $composableBuilder(
     column: $table.primaryBarcode,
     builder: (column) => ColumnOrderings(column),
@@ -43760,6 +43823,11 @@ class $$ProductBarcodesTableAnnotationComposer
 
   GeneratedColumn<String> get barcode =>
       $composableBuilder(column: $table.barcode, builder: (column) => column);
+
+  GeneratedColumn<int> get quantityMilli => $composableBuilder(
+    column: $table.quantityMilli,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get primaryBarcode => $composableBuilder(
     column: $table.primaryBarcode,
@@ -43828,6 +43896,7 @@ class $$ProductBarcodesTableTableManager
                 Value<String> deviceId = const Value.absent(),
                 Value<String> productId = const Value.absent(),
                 Value<String> barcode = const Value.absent(),
+                Value<int> quantityMilli = const Value.absent(),
                 Value<bool> primaryBarcode = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProductBarcodesCompanion(
@@ -43839,6 +43908,7 @@ class $$ProductBarcodesTableTableManager
                 deviceId: deviceId,
                 productId: productId,
                 barcode: barcode,
+                quantityMilli: quantityMilli,
                 primaryBarcode: primaryBarcode,
                 rowid: rowid,
               ),
@@ -43852,6 +43922,7 @@ class $$ProductBarcodesTableTableManager
                 required String deviceId,
                 required String productId,
                 required String barcode,
+                Value<int> quantityMilli = const Value.absent(),
                 Value<bool> primaryBarcode = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProductBarcodesCompanion.insert(
@@ -43863,6 +43934,7 @@ class $$ProductBarcodesTableTableManager
                 deviceId: deviceId,
                 productId: productId,
                 barcode: barcode,
+                quantityMilli: quantityMilli,
                 primaryBarcode: primaryBarcode,
                 rowid: rowid,
               ),
