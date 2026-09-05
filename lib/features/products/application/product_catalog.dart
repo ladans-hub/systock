@@ -138,6 +138,26 @@ class ProductCatalog {
                 ),
               );
         }
+        String? initialLotId;
+        if (warehouseId != null &&
+            barcode != null &&
+            barcode.trim().isNotEmpty) {
+          initialLotId = _uuid.v7();
+          await _db
+              .into(_db.lots)
+              .insert(
+                LotsCompanion.insert(
+                  id: initialLotId,
+                  productId: id,
+                  warehouseId: warehouseId,
+                  batchNumber: barcode.trim(),
+                  expiresAt: Value(expiresAt),
+                  createdAt: now,
+                  updatedAt: now,
+                  deviceId: deviceId,
+                ),
+              );
+        }
         if (warehouseId != null) {
           await _db
               .into(_db.inventoryBalances)
@@ -159,6 +179,7 @@ class ProductCatalog {
                     companyId: companyId,
                     productId: id,
                     warehouseId: warehouseId,
+                    lotId: Value(initialLotId),
                     movementType: 'initialStock',
                     quantityMilli: initialQuantityMilli,
                     balanceBeforeMilli: 0,
