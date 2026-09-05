@@ -441,6 +441,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         cost = TextEditingController(),
         wholesale = TextEditingController(),
         quantity = TextEditingController(text: '0');
+    DateTime? expiresAt;
     String? categoryId, brandId, unitId = units.firstOrNull?.id, imagePath;
     final submit = await showDialog<bool>(
       context: context,
@@ -604,6 +605,30 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('Validade'.localized(context)),
+                    subtitle: Text(
+                      expiresAt == null
+                          ? 'Não definida'.localized(context)
+                          : '${expiresAt!.day.toString().padLeft(2, '0')}/${expiresAt!.month.toString().padLeft(2, '0')}/${expiresAt!.year}',
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.calendar_month_outlined),
+                      onPressed: () async {
+                        final picked = await showDatePicker(
+                          context: dialog,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                          initialDate: expiresAt ?? DateTime.now(),
+                        );
+                        if (picked != null) {
+                          setDialogState(() => expiresAt = picked.toUtc());
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
@@ -717,6 +742,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
       deviceId: company.deviceId,
       name: name.text,
       barcode: barcode.text,
+      expiresAt: expiresAt,
       saleMinor: minor,
       costMinor: costMinor,
       wholesaleMinor: wholesaleMinor,

@@ -76,6 +76,7 @@ class ProductBarcodes extends SyncEntityTable {
   TextColumn get productId => text().references(Products, #id)();
   TextColumn get barcode => text().withLength(min: 4, max: 128).unique()();
   IntColumn get quantityMilli => integer().withDefault(const Constant(0))();
+  DateTimeColumn get expiresAt => dateTime().nullable()();
   BoolColumn get primaryBarcode =>
       boolean().withDefault(const Constant(false))();
 }
@@ -746,7 +747,7 @@ class AppDatabase extends _$AppDatabase {
     ),
   );
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -864,6 +865,14 @@ class AppDatabase extends _$AppDatabase {
           (row) => row.read<String>('name') == 'quantity_milli',
         )) {
           await m.addColumn(productBarcodes, productBarcodes.quantityMilli);
+        }
+      }
+      if (from < 13) {
+        final columns = await customSelect(
+          'PRAGMA table_info(product_barcodes)',
+        ).get();
+        if (!columns.any((row) => row.read<String>('name') == 'expires_at')) {
+          await m.addColumn(productBarcodes, productBarcodes.expiresAt);
         }
       }
     },

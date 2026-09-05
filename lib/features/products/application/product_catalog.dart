@@ -40,6 +40,7 @@ class ProductCatalog {
     required String name,
     String? sku,
     String? barcode,
+    DateTime? expiresAt,
     String? description,
     String? categoryId,
     String? brandId,
@@ -81,6 +82,7 @@ class ProductCatalog {
         companyId: companyId,
         productId: existingBarcode.productId,
         barcode: existingBarcode.barcode,
+        expiresAt: expiresAt,
         quantityMilli: initialQuantityMilli,
         warehouseId: warehouseId,
         deviceId: deviceId,
@@ -128,6 +130,7 @@ class ProductCatalog {
                   productId: id,
                   barcode: barcode.trim(),
                   quantityMilli: Value(initialQuantityMilli),
+                  expiresAt: Value(expiresAt),
                   primaryBarcode: const Value(true),
                   createdAt: now,
                   updatedAt: now,
@@ -221,6 +224,7 @@ class ProductCatalog {
     required String warehouseId,
     required String deviceId,
     required String userId,
+    DateTime? expiresAt,
   }) async {
     if (quantityMilli <= 0 || barcode.trim().isEmpty) {
       return const Failure(
@@ -246,7 +250,32 @@ class ProductCatalog {
                 productId: productId,
                 barcode: barcode.trim(),
                 quantityMilli: Value(quantityMilli),
+                expiresAt: Value(expiresAt),
                 primaryBarcode: const Value(false),
+                createdAt: now,
+                updatedAt: now,
+                deviceId: deviceId,
+              ),
+            );
+      }
+      final now = DateTime.now().toUtc();
+      final lot =
+          await (_db.select(_db.lots)
+                ..where((l) => l.productId.equals(productId))
+                ..where((l) => l.warehouseId.equals(warehouseId))
+                ..where((l) => l.batchNumber.equals(barcode.trim())))
+              .getSingleOrNull();
+      final lotId = lot?.id ?? _uuid.v7();
+      if (lot == null) {
+        await _db
+            .into(_db.lots)
+            .insert(
+              LotsCompanion.insert(
+                id: lotId,
+                productId: productId,
+                warehouseId: warehouseId,
+                batchNumber: barcode.trim(),
+                expiresAt: Value(expiresAt),
                 createdAt: now,
                 updatedAt: now,
                 deviceId: deviceId,
@@ -262,6 +291,7 @@ class ProductCatalog {
         deviceId: deviceId,
         userId: userId,
         reason: 'Entrada de stock · código ${barcode.trim()}',
+        lotId: lotId,
       );
       if (moved is Failure<int>) return Failure(moved.error);
       if (code != null) {
@@ -270,6 +300,7 @@ class ProductCatalog {
         )..where((b) => b.id.equals(code.id))).write(
           ProductBarcodesCompanion(
             quantityMilli: Value(code.quantityMilli + quantityMilli),
+            expiresAt: Value(expiresAt ?? code.expiresAt),
           ),
         );
       }
@@ -408,6 +439,7 @@ class ProductCatalog {
     required bool allowNegativeStock,
     required bool active,
     required String? barcode,
+    DateTime? expiresAt,
   }) async {
     if (name.trim().isEmpty ||
         [
@@ -471,6 +503,7 @@ class ProductCatalog {
           )..where((b) => b.id.equals(existing.id))).write(
             ProductBarcodesCompanion(
               barcode: Value(cleanBarcode),
+              expiresAt: Value(expiresAt),
               deletedAt: const Value(null),
               updatedAt: Value(now),
               version: Value(existing.version + 1),
@@ -488,6 +521,7 @@ class ProductCatalog {
                   createdAt: now,
                   updatedAt: now,
                   deviceId: current.deviceId,
+                  expiresAt: Value(expiresAt),
                 ),
               );
         }

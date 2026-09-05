@@ -61,6 +61,11 @@ class InventoryPage extends ConsumerWidget {
                       icon: const Icon(Icons.tune),
                       label: const LocalizedText('Ajustar'),
                     ),
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/inventory/lots'),
+                      icon: const Icon(Icons.event_outlined),
+                      label: const LocalizedText('Lotes e validades'),
+                    ),
                   ],
                 ),
               ),

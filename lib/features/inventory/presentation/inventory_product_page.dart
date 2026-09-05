@@ -307,6 +307,7 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
 
   Future<void> _addEntry(AppDatabase db, Product product) async {
     final code = TextEditingController(), quantity = TextEditingController();
+    DateTime? expiresAt;
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialog) => AlertDialog(
@@ -324,6 +325,31 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
                 decimal: true,
               ),
               decoration: const InputDecoration(labelText: 'Quantidade'),
+            ),
+            StatefulBuilder(
+              builder: (context, setState) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Validade'),
+                subtitle: Text(
+                  expiresAt == null
+                      ? 'Não definida'
+                      : '${expiresAt!.day.toString().padLeft(2, '0')}/${expiresAt!.month.toString().padLeft(2, '0')}/${expiresAt!.year}',
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.calendar_month_outlined),
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                      initialDate: expiresAt ?? DateTime.now(),
+                    );
+                    if (picked != null) {
+                      setState(() => expiresAt = picked.toUtc());
+                    }
+                  },
+                ),
+              ),
             ),
           ],
         ),
@@ -357,6 +383,7 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
       warehouseId: warehouse.id,
       deviceId: product.deviceId,
       userId: user.id,
+      expiresAt: expiresAt,
     );
     if (!mounted) return;
     _message(switch (result) {

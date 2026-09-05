@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart' show Variable;
+import 'package:drift/drift.dart' show Value, Variable;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -14,6 +14,55 @@ import 'package:systock/core/widgets/platform_controls.dart';
 import 'package:systock/features/products/presentation/product_image.dart';
 import 'package:systock/features/inventory/application/inventory_ledger.dart';
 import 'package:systock/core/utils/money.dart';
+
+class _BarcodeExpiryTile extends StatefulWidget {
+  const _BarcodeExpiryTile({required this.db, required this.barcode});
+  final AppDatabase db;
+  final ProductBarcode barcode;
+
+  @override
+  State<_BarcodeExpiryTile> createState() => _BarcodeExpiryTileState();
+}
+
+class _BarcodeExpiryTileState extends State<_BarcodeExpiryTile> {
+  late DateTime? expiresAt = widget.barcode.expiresAt;
+
+  Future<void> _pick() async {
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      initialDate: expiresAt ?? DateTime.now(),
+    );
+    if (picked == null) return;
+    final value = picked.toUtc();
+    await (widget.db.update(widget.db.productBarcodes)
+          ..where((b) => b.id.equals(widget.barcode.id)))
+        .write(ProductBarcodesCompanion(expiresAt: Value(value)));
+    if (mounted) setState(() => expiresAt = value);
+  }
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    title: Text('Validade · ${widget.barcode.barcode}'),
+    subtitle: Text('Quantidade: ${widget.barcode.quantityMilli / 1000}'),
+    trailing: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          expiresAt == null
+              ? 'Não definida'
+              : '${expiresAt!.day.toString().padLeft(2, '0')}/${expiresAt!.month.toString().padLeft(2, '0')}/${expiresAt!.year}',
+        ),
+        IconButton(
+          icon: const Icon(Icons.edit_calendar_outlined),
+          tooltip: 'Alterar validade'.localized(context),
+          onPressed: _pick,
+        ),
+      ],
+    ),
+  );
+}
 
 class ProductDetailPage extends ConsumerWidget {
   const ProductDetailPage(this.id, {super.key});
@@ -123,6 +172,8 @@ class ProductDetailPage extends ConsumerWidget {
                             d.barcodes.map((b) => b.barcode).join(', '),
                           ),
                         ),
+                        for (final code in d.barcodes)
+                          _BarcodeExpiryTile(db: db, barcode: code),
                         FutureBuilder<int>(
                           future: db
                               .customSelect(

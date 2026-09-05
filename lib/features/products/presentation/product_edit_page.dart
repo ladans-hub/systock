@@ -1,4 +1,5 @@
 import 'package:file_picker/file_picker.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,60 @@ import 'package:systock/core/widgets/platform_controls.dart';
 import 'package:systock/features/products/application/product_catalog.dart';
 import 'package:systock/features/products/application/product_image_service.dart';
 import 'package:systock/features/products/presentation/product_image.dart';
+
+class _LotExpiryEditor extends StatefulWidget {
+  const _LotExpiryEditor({
+    required this.db,
+    required this.lot,
+    required this.onChanged,
+  });
+  final AppDatabase db;
+  final Lot lot;
+  final ValueChanged<DateTime> onChanged;
+
+  @override
+  State<_LotExpiryEditor> createState() => _LotExpiryEditorState();
+}
+
+class _LotExpiryEditorState extends State<_LotExpiryEditor> {
+  late DateTime? expiresAt = widget.lot.expiresAt;
+
+  Future<void> _pick() async {
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      initialDate: expiresAt ?? DateTime.now(),
+    );
+    if (picked == null) return;
+    final value = picked.toUtc();
+    await (widget.db.update(
+      widget.db.lots,
+    )..where((l) => l.id.equals(widget.lot.id))).write(
+      LotsCompanion(
+        expiresAt: Value(value),
+        updatedAt: Value(DateTime.now().toUtc()),
+      ),
+    );
+    if (mounted) setState(() => expiresAt = value);
+    widget.onChanged(value);
+  }
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    contentPadding: EdgeInsets.zero,
+    title: Text('Lote: ${widget.lot.batchNumber}'),
+    subtitle: Text(
+      expiresAt == null
+          ? 'Validade não definida'
+          : 'Validade: ${expiresAt!.day.toString().padLeft(2, '0')}/${expiresAt!.month.toString().padLeft(2, '0')}/${expiresAt!.year}',
+    ),
+    trailing: IconButton(
+      icon: const Icon(Icons.edit_calendar_outlined),
+      onPressed: _pick,
+    ),
+  );
+}
 
 class ProductEditPage extends ConsumerStatefulWidget {
   const ProductEditPage(this.id, {super.key});
@@ -24,11 +79,13 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   List<Category> categories = const [];
   List<Brand> brands = const [];
   List<Unit> units = const [];
+  List<Lot> lots = const [];
   final name = TextEditingController();
   final description = TextEditingController();
   final barcode = TextEditingController();
   final location = TextEditingController();
   final shelf = TextEditingController();
+  DateTime? expiresAt;
   String? categoryId, brandId, unitId, selectedImage;
   bool loading = true, saving = false;
 
@@ -52,10 +109,16 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     categories = await db.select(db.categories).get();
     brands = await db.select(db.brands).get();
     units = await db.select(db.units).get();
+    lots =
+        await (db.select(db.lots)
+              ..where((l) => l.productId.equals(widget.id))
+              ..where((l) => l.deletedAt.isNull()))
+            .get();
     product = loaded;
     name.text = loaded.name;
     description.text = loaded.description ?? '';
     barcode.text = primaryBarcode?.barcode ?? '';
+    expiresAt = primaryBarcode?.expiresAt;
     location.text = loaded.location ?? '';
     shelf.text = loaded.shelf ?? '';
     categoryId = loaded.categoryId;
@@ -96,6 +159,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       allowNegativeStock: current.allowNegativeStock,
       active: current.active,
       barcode: barcode.text,
+      expiresAt: expiresAt,
     );
     if (result case Success()) {
       if (selectedImage != null) {
@@ -232,6 +296,29 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
             children: [
               _field(name, 'Nome *'),
               _field(description, 'Descrição', lines: 3),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const LocalizedText('Validade'),
+                subtitle: Text(
+                  expiresAt == null
+                      ? 'Não definida'.localized(context)
+                      : '${expiresAt!.day.toString().padLeft(2, '0')}/${expiresAt!.month.toString().padLeft(2, '0')}/${expiresAt!.year}',
+                ),
+                trailing: IconButton(
+                  icon: const Icon(Icons.calendar_month_outlined),
+                  onPressed: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                      initialDate: expiresAt ?? DateTime.now(),
+                    );
+                    if (picked != null) {
+                      setState(() => expiresAt = picked.toUtc());
+                    }
+                  },
+                ),
+              ),
               _dropdown(
                 'Categoria',
                 categoryId,
@@ -258,6 +345,24 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
             children: [
               _field(location, 'Localização'),
               _field(shelf, 'Prateleira'),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _Section(
+            title: 'Lotes e validades',
+            children: [
+              if (lots.isEmpty) const LocalizedText('Nenhum lote registrado.'),
+              for (final lot in lots)
+                _LotExpiryEditor(
+                  db: ref.read(databaseProvider),
+                  lot: lot,
+                  onChanged: (value) => setState(() {
+                    final index = lots.indexWhere((item) => item.id == lot.id);
+                    if (index >= 0) {
+                      lots[index] = lot.copyWith(expiresAt: Value(value));
+                    }
+                  }),
+                ),
             ],
           ),
         ],

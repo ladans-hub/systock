@@ -38,6 +38,7 @@ class InventoryLedger {
     required String reason,
     bool allowNegative = false,
     String? referenceId,
+    String? lotId,
   }) async {
     if (quantityMilli == 0 || reason.trim().isEmpty) {
       return const Failure(
@@ -71,6 +72,7 @@ class InventoryLedger {
                 companyId: companyId,
                 productId: productId,
                 warehouseId: warehouseId,
+                lotId: Value(lotId),
                 movementType: type.name,
                 quantityMilli: quantityMilli,
                 balanceBeforeMilli: before,
