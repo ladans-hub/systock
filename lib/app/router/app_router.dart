@@ -39,12 +39,14 @@ import 'package:systock/features/purchases/presentation/purchase_orders_page.dar
 import 'package:systock/features/inventory/presentation/lots_page.dart';
 import 'package:systock/features/purchases/presentation/purchase_detail_page.dart';
 import 'package:systock/core/security/permission_gate.dart';
+import 'package:systock/features/licensing/presentation/activation_page.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
   routes: [
     GoRoute(path: '/', builder: (_, _) => const StartupPage()),
     GoRoute(path: '/onboarding', builder: (_, _) => const OnboardingPage()),
+    GoRoute(path: '/activation', builder: (_, _) => const ActivationPage()),
     ShellRoute(
       builder: (_, state, child) => SessionAccessGate(
         location: state.uri.path,
@@ -221,6 +223,10 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/settings/business-rules',
           builder: (_, _) => const BusinessRulesPage(),
+        ),
+        GoRoute(
+          path: '/settings/plan',
+          builder: (_, _) => const ActivationPage(),
         ),
       ],
     ),

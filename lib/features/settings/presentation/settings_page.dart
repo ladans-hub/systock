@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:drift/drift.dart' show InsertMode;
 import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:systock/app/theme/theme_controller.dart';
 import 'package:systock/core/database/database_provider.dart';
+import 'package:systock/core/database/app_database.dart';
 import 'package:systock/features/onboarding/application/demo_data_seeder.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -74,6 +76,8 @@ class SettingsPage extends ConsumerWidget {
             onSelected: (value) =>
                 ref.read(themeModeProvider.notifier).state = value,
           ),
+          const SizedBox(height: 12),
+          _ColorPaletteCard(en: en),
           const SizedBox(height: 12),
           _PreferenceCard<Locale>(
             icon: Icons.language_outlined,
@@ -200,6 +204,169 @@ class SettingsPage extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _ColorPaletteCard extends ConsumerWidget {
+  const _ColorPaletteCard({required this.en});
+
+  final bool en;
+
+  static const colors = <Color>[
+    Color(0xFF2F6BFF),
+    Color(0xFF6750A4),
+    Color(0xFF00897B),
+    Color(0xFF2E7D32),
+    Color(0xFFF57C00),
+    Color(0xFFD32F2F),
+    Color(0xFFC2185B),
+    Color(0xFF455A64),
+    Color(0xFFF9A825),
+    Color(0xFF689F38),
+    Color(0xFF00ACC1),
+  ];
+
+  Future<void> _save(WidgetRef ref, AppPalette palette) async {
+    ref.read(appPaletteProvider.notifier).state = palette;
+    final db = ref.read(databaseProvider);
+    await db
+        .into(db.appSettings)
+        .insert(
+          AppSettingsCompanion.insert(
+            key: 'appearance.palette',
+            valueJson:
+                '${palette.primary.toARGB32()},${palette.secondary.toARGB32()}',
+            updatedAt: DateTime.now().toUtc(),
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = ref.watch(appPaletteProvider);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.color_lens_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        en ? 'Color palette' : 'Paleta de cores',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      Text(
+                        en
+                            ? 'Personalize the system identity'
+                            : 'Personalize a identidade do sistema',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                TextButton(
+                  onPressed: palette == AppPalette.defaults
+                      ? null
+                      : () => _save(ref, AppPalette.defaults),
+                  child: Text(en ? 'Reset' : 'Repor'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _ColorSelector(
+              label: en ? 'Primary color' : 'Cor primária',
+              colors: colors,
+              selected: palette.primary,
+              onSelected: (color) =>
+                  _save(ref, palette.copyWith(primary: color)),
+            ),
+            const SizedBox(height: 16),
+            _ColorSelector(
+              label: en ? 'Secondary color' : 'Cor secundária',
+              colors: colors,
+              selected: palette.secondary,
+              onSelected: (color) =>
+                  _save(ref, palette.copyWith(secondary: color)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ColorSelector extends StatelessWidget {
+  const _ColorSelector({
+    required this.label,
+    required this.colors,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final List<Color> colors;
+  final Color selected;
+  final ValueChanged<Color> onSelected;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+      const SizedBox(height: 10),
+      Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          for (final color in colors)
+            Semantics(
+              label: label,
+              selected: color == selected,
+              button: true,
+              child: InkWell(
+                onTap: () => onSelected(color),
+                customBorder: const CircleBorder(),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: color == selected
+                          ? Theme.of(context).colorScheme.onSurface
+                          : Colors.transparent,
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: .28),
+                        blurRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: color == selected
+                      ? const Icon(Icons.check, color: Colors.white, size: 20)
+                      : null,
+                ),
+              ),
+            ),
+        ],
+      ),
+    ],
+  );
 }
 
 class _PreferenceCard<T> extends StatelessWidget {

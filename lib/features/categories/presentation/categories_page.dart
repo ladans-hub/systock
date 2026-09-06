@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:systock/core/database/app_database.dart';
@@ -266,7 +266,7 @@ class _CatalogRow {
   final VoidCallback onDelete;
 }
 
-class _CatalogList extends StatelessWidget {
+class _CatalogList extends StatefulWidget {
   const _CatalogList({
     required this.rows,
     required this.emptyText,
@@ -278,39 +278,76 @@ class _CatalogList extends StatelessWidget {
   final String addLabel;
   final VoidCallback onAdd;
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: rows.isEmpty
-        ? Center(child: LocalizedText(emptyText))
-        : ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: rows.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
-            itemBuilder: (_, index) {
-              final row = rows[index];
-              return ListTile(
-                leading: Icon(row.icon),
-                title: Text(row.name),
-                trailing: PopupMenuButton<String>(
-                  onSelected: (action) =>
-                      action == 'edit' ? row.onEdit() : row.onDelete(),
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: LocalizedText('Editar'),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: LocalizedText('Remover'),
-                    ),
-                  ],
-                ),
-              );
-            },
+  State<_CatalogList> createState() => _CatalogListState();
+}
+
+class _CatalogListState extends State<_CatalogList> {
+  String query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.rows
+        .where((row) => row.name.toLowerCase().contains(query.toLowerCase()))
+        .toList();
+    return Scaffold(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: TextField(
+              onChanged: (value) => setState(() => query = value),
+              decoration: InputDecoration(
+                hintText: 'Pesquisar categorias ou marcas',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: query.isEmpty
+                    ? null
+                    : IconButton(
+                        onPressed: () => setState(() => query = ''),
+                        icon: const Icon(Icons.clear),
+                      ),
+                border: const OutlineInputBorder(),
+              ),
+            ),
           ),
-    floatingActionButton: FloatingActionButton.extended(
-      onPressed: onAdd,
-      icon: const Icon(Icons.add),
-      label: LocalizedText(addLabel),
-    ),
-  );
+          Expanded(
+            child: widget.rows.isEmpty
+                ? Center(child: LocalizedText(widget.emptyText))
+                : filtered.isEmpty
+                ? const Center(child: Text('Nenhum resultado encontrado.'))
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (_, index) {
+                      final row = filtered[index];
+                      return ListTile(
+                        leading: Icon(row.icon),
+                        title: Text(row.name),
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (action) =>
+                              action == 'edit' ? row.onEdit() : row.onDelete(),
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(
+                              value: 'edit',
+                              child: LocalizedText('Editar'),
+                            ),
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: LocalizedText('Remover'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: widget.onAdd,
+        icon: const Icon(Icons.add),
+        label: LocalizedText(widget.addLabel),
+      ),
+    );
+  }
 }

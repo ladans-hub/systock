@@ -7,13 +7,13 @@ import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:systock/app/theme/app_theme.dart';
 import 'package:systock/core/database/database_provider.dart';
 import 'package:systock/core/widgets/global_search.dart';
 import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/security/permission_gate.dart';
 import 'package:systock/core/widgets/platform_controls.dart';
 import 'package:systock/l10n/generated/app_localizations.dart';
+import 'package:systock/core/licensing/license_service.dart';
 
 class AdaptiveShell extends ConsumerWidget {
   const AdaptiveShell({required this.location, required this.child, super.key});
@@ -28,9 +28,15 @@ class AdaptiveShell extends ConsumerWidget {
     (label: 'Cotações', path: '/quotes', icon: Icons.request_quote_outlined),
     (label: 'Relatórios', path: '/reports', icon: Icons.analytics_outlined),
     (label: 'Configurações', path: '/settings', icon: Icons.settings_outlined),
+    (
+      label: 'Planos e subscrições',
+      path: '/settings/plan',
+      icon: Icons.workspace_premium_outlined,
+    ),
   ];
 
   int get selectedIndex {
+    if (location.startsWith('/settings/plan')) return 8;
     final index = destinations.indexWhere((d) => location.startsWith(d.path));
     return index < 0 ? 0 : index;
   }
@@ -173,7 +179,7 @@ class AdaptiveShell extends ConsumerWidget {
         onTap: (i) => i == 4
             ? _showMore(context)
             : context.go(destinations[indexes[i]].path),
-        selectedItemColor: AppTheme.brand,
+        selectedItemColor: Theme.of(context).colorScheme.primary,
         items: [
           for (final i in indexes)
             AdaptiveNavigationDestination(
@@ -209,6 +215,7 @@ class AdaptiveShell extends ConsumerWidget {
       4 => selected ? 'bag.fill' : 'bag',
       5 => selected ? 'doc.text.fill' : 'doc.text',
       6 => selected ? 'chart.bar.fill' : 'chart.bar',
+      8 => selected ? 'star.fill' : 'star',
       _ => selected ? 'gearshape.fill' : 'gearshape',
     };
   }
@@ -233,6 +240,7 @@ class AdaptiveShell extends ConsumerWidget {
       4 => CupertinoIcons.bag,
       5 => CupertinoIcons.doc_text,
       6 => CupertinoIcons.chart_bar,
+      8 => CupertinoIcons.star,
       _ => CupertinoIcons.settings,
     };
   }
@@ -386,6 +394,7 @@ class AdaptiveShell extends ConsumerWidget {
                   _item(context, 6),
                   const Spacer(),
                   _item(context, 7),
+                  _item(context, 8),
                   const _UserFooter(),
                 ],
               ),
@@ -403,7 +412,9 @@ class AdaptiveShell extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       child: Material(
-        color: selected ? AppTheme.brand : Colors.transparent,
+        color: selected
+            ? Theme.of(context).colorScheme.primary
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
@@ -454,6 +465,8 @@ class AdaptiveShell extends ConsumerWidget {
       '/inventory' => l10n.inventory,
       '/sales' => l10n.sales,
       '/settings' => l10n.settings,
+      '/settings/plan' =>
+        en ? 'Plans and subscriptions' : 'Planos e subscrições',
       '/pos' => en ? 'Point of sale' : 'Ponto de venda',
       '/quotes' => en ? 'Quotes' : 'Cotações',
       '/reports' => en ? 'Reports' : 'Relatórios',
@@ -490,9 +503,7 @@ class _BrandMark extends ConsumerWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1AC6D9), AppTheme.brand],
-              ),
+              color: Theme.of(context).colorScheme.primary,
               borderRadius: BorderRadius.circular(9),
             ),
             clipBehavior: Clip.antiAlias,
@@ -566,34 +577,103 @@ class _UserFooter extends ConsumerWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      LocalizedText(
-                        'Dados neste dispositivo',
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () {
-                ref.read(sessionLockedProvider.notifier).state = true;
-                ref.read(sessionUserIdProvider.notifier).state = null;
-                ref.invalidate(activePermissionsProvider);
-                context.go('/');
+            const SizedBox(height: 12),
+            FutureBuilder<LicenseStatus>(
+              future: LicenseService(ref.watch(databaseProvider)).status(),
+              builder: (context, licenseSnapshot) {
+                final status = licenseSnapshot.data;
+                if (status == null) return const SizedBox.shrink();
+                final label = status.trial
+                    ? 'Plano Trial'
+                    : 'Plano ${status.plan?.label ?? ''}';
+                final detail = status.trial
+                    ? '${status.trialDaysLeft} ${status.trialDaysLeft == 1 ? 'dia' : 'dias'} restantes'
+                    : status.plan == LicensePlan.lifetime
+                    ? 'Para sempre'
+                    : 'Ativo';
+                return InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => context.go('/settings/plan'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.primary.withValues(alpha: .10),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.workspace_premium_outlined,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            label,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          detail,
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
               },
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                child: Row(
-                  children: [
-                    AdaptiveIcon(PlatformGlyph.logout, size: 18),
-                    SizedBox(width: 10),
-                    LocalizedText('Terminar sessão'),
-                  ],
+            ),
+            const SizedBox(height: 8),
+            const Divider(height: 1),
+            const SizedBox(height: 8),
+            Material(
+              color: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest.withValues(alpha: .55),
+              borderRadius: BorderRadius.circular(10),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () {
+                  ref.read(sessionLockedProvider.notifier).state = true;
+                  ref.read(sessionUserIdProvider.notifier).state = null;
+                  ref.invalidate(activePermissionsProvider);
+                  context.go('/');
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      AdaptiveIcon(PlatformGlyph.logout, size: 18),
+                      SizedBox(width: 10),
+                      LocalizedText('Terminar sessão'),
+                    ],
+                  ),
                 ),
+              ),
+            ),
+            const SizedBox(height: 2),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: LocalizedText(
+                'Dados neste dispositivo',
+                style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic),
               ),
             ),
           ],

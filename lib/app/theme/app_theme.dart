@@ -1,23 +1,25 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:systock/app/theme/theme_controller.dart';
 
 abstract final class AppTheme {
-  static const brand = Color(0xFF2F6BFF);
   static const _darkBackground = Color(0xFF09131B);
   static const _darkSurface = Color(0xFF121F29);
 
-  static ThemeData get light => _build(Brightness.light);
-  static ThemeData get dark => _build(Brightness.dark);
+  static ThemeData light(AppPalette palette) =>
+      _build(Brightness.light, palette);
+  static ThemeData dark(AppPalette palette) => _build(Brightness.dark, palette);
 
-  static ThemeData _build(Brightness brightness) {
+  static ThemeData _build(Brightness brightness, AppPalette palette) {
     final dark = brightness == Brightness.dark;
     final scheme =
         ColorScheme.fromSeed(
-          seedColor: brand,
+          seedColor: palette.primary,
           brightness: brightness,
           surface: dark ? _darkSurface : Colors.white,
         ).copyWith(
-          primary: brand,
+          primary: palette.primary,
+          secondary: palette.secondary,
           outline: dark ? const Color(0xFF33424D) : const Color(0xFFD5DCE3),
           outlineVariant: dark
               ? const Color(0xFF263640)
@@ -63,14 +65,14 @@ abstract final class AppTheme {
         elevation: 0,
         height: 68,
         backgroundColor: dark ? const Color(0xFF0D1821) : Colors.white,
-        indicatorColor: brand.withValues(alpha: .18),
+        indicatorColor: palette.primary.withValues(alpha: .18),
         labelTextStyle: const WidgetStatePropertyAll(
           TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
         ),
       ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: dark ? const Color(0xFF0D1821) : Colors.white,
-        indicatorColor: brand,
+        indicatorColor: palette.primary,
         selectedIconTheme: const IconThemeData(color: Colors.white),
         selectedLabelTextStyle: TextStyle(
           color: scheme.onSurface,
@@ -91,6 +93,37 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          backgroundColor: scheme.primary,
+          foregroundColor: scheme.onPrimary,
+          minimumSize: const Size(44, 44),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: scheme.primary,
+          foregroundColor: scheme.onPrimary,
+          minimumSize: const Size(44, 44),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: scheme.primary,
+          side: BorderSide(color: scheme.primary),
+          minimumSize: const Size(44, 44),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: scheme.primary,
           minimumSize: const Size(44, 44),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radius),

@@ -445,6 +445,9 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     String? categoryId, brandId, unitId = units.firstOrNull?.id, imagePath;
     final submit = await showDialog<bool>(
       context: context,
+      // O formulário de cadastro contém dados sensíveis; só pode ser
+      // fechado explicitamente pelos botões Cancelar ou Salvar.
+      barrierDismissible: false,
       builder: (dialog) => StatefulBuilder(
         builder: (dialog, setDialogState) => AlertDialog(
           title: const LocalizedText('Novo produto'),

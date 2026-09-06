@@ -63,6 +63,7 @@ dependencies:
   excel_community: ^2.2.1
   google_sign_in: ^7.2.0
   flutter_local_notifications: ^22.3.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -87,6 +88,7 @@ flutter:
   generate: true
   assets:
     - assets/demo/products/
+    - assets/branding/whatsapp.png
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

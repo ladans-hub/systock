@@ -58,6 +58,8 @@ PODS:
   - PromisesObjC (2.4.1)
   - PromisesSwift (2.4.1):
     - PromisesObjC (= 2.4.1)
+  - url_launcher_macos (0.0.1):
+    - FlutterMacOS
 
 DEPENDENCIES:
   - file_picker_darwin (from `Flutter/ephemeral/.symlinks/plugins/file_picker_darwin/darwin`)
@@ -68,6 +70,7 @@ DEPENDENCIES:
   - local_auth_darwin (from `Flutter/ephemeral/.symlinks/plugins/local_auth_darwin/darwin`)
   - mobile_scanner (from `Flutter/ephemeral/.symlinks/plugins/mobile_scanner/darwin`)
   - printing (from `Flutter/ephemeral/.symlinks/plugins/printing/macos`)
+  - url_launcher_macos (from `Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos`)
 
 SPEC REPOS:
   trunk:
@@ -97,6 +100,8 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/mobile_scanner/darwin
   printing:
     :path: Flutter/ephemeral/.symlinks/plugins/printing/macos
+  url_launcher_macos:
+    :path: Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos
 
 SPEC CHECKSUMS:
   AppAuth: ef4da5a3fc2e10b90c09a0a94a9baeaedc0341d5
@@ -115,6 +120,7 @@ SPEC CHECKSUMS:
   printing: 7916ffaaede65713863e621de9a4742d9fa723b9
   PromisesObjC: 752c3227f599e3467650e47ea36f433eeb10c273
   PromisesSwift: 217dea0fd5d2ad65222a109c48698add13cc1c5b
+  url_launcher_macos: f87a979182d112f911de6820aefddaf56ee9fbfd
 
 PODFILE CHECKSUM: 13edfb9e70ac3646927b8e6c9a212ad1d0fa29b2
 

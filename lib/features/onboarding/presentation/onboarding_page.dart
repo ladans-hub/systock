@@ -13,6 +13,7 @@ import 'package:systock/core/sync/google_drive_transport.dart';
 import 'package:systock/core/sync/drive_recovery_snapshot.dart';
 import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/widgets/secure_text_field.dart';
+import 'package:systock/core/licensing/license_service.dart';
 
 class OnboardingPage extends ConsumerStatefulWidget {
   const OnboardingPage({super.key});
@@ -118,6 +119,8 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           db.users,
         )..where((u) => u.username.equals(username.text.trim()))).getSingle();
         await setCurrentSessionUser(db, adminUser);
+        // Inicia o período de teste no momento em que a empresa é criada.
+        await LicenseService(db).status();
         if (!mounted) return;
         ref.read(sessionUserIdProvider.notifier).state = adminUser.id;
         context.go('/dashboard');

@@ -9,17 +9,20 @@ import 'package:systock/l10n/generated/app_localizations.dart';
 class SystockApp extends ConsumerWidget {
   const SystockApp({super.key});
   @override
-  Widget build(BuildContext context, WidgetRef ref) => MaterialApp.router(
-    title: 'Systock',
-    debugShowCheckedModeBanner: false,
-    theme: AppTheme.light,
-    darkTheme: AppTheme.dark,
-    themeMode: ref.watch(themeModeProvider),
-    locale: ref.watch(appLocaleProvider),
-    routerConfig: appRouter,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    builder: (_, child) =>
-        SessionLifecycle(child: child ?? const SizedBox.shrink()),
-  );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final palette = ref.watch(appPaletteProvider);
+    return MaterialApp.router(
+      title: 'Systock',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light(palette),
+      darkTheme: AppTheme.dark(palette),
+      themeMode: ref.watch(themeModeProvider),
+      locale: ref.watch(appLocaleProvider),
+      routerConfig: appRouter,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      builder: (_, child) =>
+          SessionLifecycle(child: child ?? const SizedBox.shrink()),
+    );
+  }
 }
