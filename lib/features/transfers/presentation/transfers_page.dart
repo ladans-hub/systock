@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -86,9 +87,7 @@ class TransfersPage extends ConsumerWidget {
     final result = await operation;
     if (context.mounted) {
       if (result case Failure(:final error)) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.userMessage)));
+        showAppFailure(context, error);
       }
     }
   }
@@ -102,13 +101,7 @@ class TransfersPage extends ConsumerWidget {
         )..where((p) => p.deletedAt.isNull())).get();
     if (warehouses.length < 2 || products.isEmpty) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: LocalizedText(
-              'Cadastre dois armazéns e um produto primeiro.',
-            ),
-          ),
-        );
+        showAppError(context, 'Cadastre dois armazéns e um produto primeiro.');
       }
       return;
     }
@@ -218,9 +211,7 @@ class TransfersPage extends ConsumerWidget {
     );
     if (context.mounted) {
       if (result case Failure(:final error)) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.userMessage)));
+        showAppFailure(context, error);
       }
     }
   }

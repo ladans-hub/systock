@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -115,11 +116,7 @@ class WarehousesPage extends ConsumerWidget {
           );
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: LocalizedText('Já existe um armazém com este código.'),
-          ),
-        );
+        showAppError(context, 'Já existe um armazém com este código.');
       }
     }
   }

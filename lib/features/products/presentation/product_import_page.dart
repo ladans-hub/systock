@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -41,7 +42,7 @@ class _ProductImportPageState extends ConsumerState<ProductImportPage> {
           }
         });
       case Failure(:final error):
-        _message(error.userMessage);
+        showAppFailure(context, error);
     }
   }
 
@@ -93,7 +94,7 @@ class _ProductImportPageState extends ConsumerState<ProductImportPage> {
         );
         Navigator.pop(context);
       case Failure(:final error):
-        _message(error.userMessage);
+        showAppFailure(context, error);
     }
   }
 

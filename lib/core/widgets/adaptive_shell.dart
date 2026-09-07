@@ -29,7 +29,7 @@ class AdaptiveShell extends ConsumerWidget {
     (label: 'Relatórios', path: '/reports', icon: Icons.analytics_outlined),
     (label: 'Configurações', path: '/settings', icon: Icons.settings_outlined),
     (
-      label: 'Planos e subscrições',
+      label: 'Planos',
       path: '/settings/plan',
       icon: Icons.workspace_premium_outlined,
     ),
@@ -465,8 +465,7 @@ class AdaptiveShell extends ConsumerWidget {
       '/inventory' => l10n.inventory,
       '/sales' => l10n.sales,
       '/settings' => l10n.settings,
-      '/settings/plan' =>
-        en ? 'Plans and subscriptions' : 'Planos e subscrições',
+      '/settings/plan' => en ? 'Plans' : 'Planos',
       '/pos' => en ? 'Point of sale' : 'Ponto de venda',
       '/quotes' => en ? 'Quotes' : 'Cotações',
       '/reports' => en ? 'Reports' : 'Relatórios',

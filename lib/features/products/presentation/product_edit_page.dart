@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
@@ -168,7 +169,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         ).attach(product: updated, sourcePath: selectedImage!);
         if (imageResult case Failure(:final error)) {
           if (mounted) setState(() => saving = false);
-          _message(error.userMessage);
+          if (mounted) await showAppFailure(context, error);
           return;
         }
       }
@@ -176,12 +177,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       return;
     }
     if (mounted) setState(() => saving = false);
-    _message((result as Failure<void>).error.userMessage);
-  }
-
-  void _message(String value) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
+    if (mounted) await showAppFailure(context, (result as Failure<void>).error);
   }
 
   @override

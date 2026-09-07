@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -125,12 +126,9 @@ class PurchasesPage extends ConsumerWidget {
         )..where((p) => p.deletedAt.isNull())).get();
     if (suppliers.isEmpty || products.isEmpty) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: LocalizedText(
-              'Cadastre pelo menos um fornecedor e um produto.',
-            ),
-          ),
+        showAppError(
+          context,
+          'Cadastre pelo menos um fornecedor e um produto.',
         );
       }
       return;
@@ -240,9 +238,7 @@ class PurchasesPage extends ConsumerWidget {
     );
     if (context.mounted) {
       if (result case Failure(:final error)) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.userMessage)));
+        showAppFailure(context, error);
       }
     }
   }

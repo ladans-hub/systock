@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart' as picker;
@@ -43,11 +44,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
     } catch (error, stackTrace) {
       debugPrint('Falha ao guardar relatório: $error\n$stackTrace');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: LocalizedText('Não foi possível guardar o relatório.'),
-        ),
-      );
+      showAppError(context, 'Não foi possível guardar o relatório.');
     }
   }
 

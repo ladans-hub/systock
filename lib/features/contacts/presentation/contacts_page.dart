@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -150,14 +151,13 @@ class ContactsPage extends ConsumerWidget {
                         );
                     if (!dialog.mounted) return;
                     Navigator.pop(dialog);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(switch (result) {
-                          Success() => 'Pagamento registrado.',
-                          Failure(:final error) => error.userMessage,
-                        }),
-                      ),
-                    );
+                    if (result case Failure(:final error)) {
+                      showAppFailure(context, error);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Pagamento registrado.')),
+                      );
+                    }
                   },
             child: const LocalizedText('Registrar'),
           ),

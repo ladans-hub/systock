@@ -66,35 +66,27 @@ class ProductCatalog {
         ValidationFailure('Informe um nome e preços válidos.'),
       );
     }
-    final existingBarcode = barcode?.trim().isEmpty ?? true
-        ? null
-        : await (_db.select(_db.productBarcodes)
-                ..where((b) => b.barcode.equals(barcode!.trim()))
-                ..where((b) => b.deletedAt.isNull()))
-              .getSingleOrNull();
-    if (existingBarcode != null) {
-      if (warehouseId == null || userId == null) {
-        return const Failure(
-          ValidationFailure('Informe o armazém e utilizador da entrada.'),
-        );
-      }
-      final entry = await addStockEntry(
-        companyId: companyId,
-        productId: existingBarcode.productId,
-        barcode: existingBarcode.barcode,
-        expiresAt: expiresAt,
-        quantityMilli: initialQuantityMilli,
-        warehouseId: warehouseId,
-        deviceId: deviceId,
-        userId: userId,
-      );
-      return switch (entry) {
-        Success() => Success(existingBarcode.productId),
-        Failure(:final error) => Failure(error),
-      };
-    }
     final id = _uuid.v7(), now = DateTime.now().toUtc();
     try {
+      final existingBarcode = barcode?.trim().isEmpty ?? true
+          ? null
+          : await (_db.select(_db.productBarcodes)
+                  ..where((b) => b.barcode.equals(barcode!.trim())))
+                .getSingleOrNull();
+      if (existingBarcode != null) {
+        final existingProduct =
+            await (_db.select(_db.products)
+                  ..where((p) => p.id.equals(existingBarcode.productId)))
+                .getSingleOrNull();
+        final productName = existingProduct?.name ?? existingBarcode.productId;
+        return Failure(
+          ValidationFailure(
+            'O código de barras "${barcode!.trim()}" já pertence ao produto "$productName".'
+            '${existingProduct?.deletedAt != null ? " Este produto está arquivado." : " Abra o produto existente para editar ou adicionar stock."}'
+            ' Nenhum produto foi criado e o stock não foi alterado.',
+          ),
+        );
+      }
       await _db.transaction(() async {
         await _db
             .into(_db.products)

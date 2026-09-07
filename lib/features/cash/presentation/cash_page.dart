@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -207,9 +208,7 @@ class CashPage extends ConsumerWidget {
       );
       (context as Element).markNeedsBuild();
     } else if (result case Failure(:final error)) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.userMessage)));
+      showAppFailure(context, error);
     }
   }
 }

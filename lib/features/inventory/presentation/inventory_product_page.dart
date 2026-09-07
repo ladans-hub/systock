@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Variable;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -308,10 +309,11 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
       allowNegative: product.allowNegativeStock,
     );
     if (!mounted) return;
-    _message(switch (result) {
-      Success() => 'Stock atualizado com movimento auditável.',
-      Failure(:final error) => error.userMessage,
-    });
+    if (result case Failure(:final error)) {
+      showAppFailure(context, error);
+    } else {
+      _message('Stock atualizado com movimento auditável.');
+    }
   }
 
   Future<void> _addEntry(AppDatabase db, Product product) async {
@@ -401,10 +403,11 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
       expiresAt: expiresAt,
     );
     if (!mounted) return;
-    _message(switch (result) {
-      Success() => 'Entrada adicionada.',
-      Failure(:final error) => error.userMessage,
-    });
+    if (result case Failure(:final error)) {
+      showAppFailure(context, error);
+    } else {
+      _message('Entrada adicionada.');
+    }
   }
 
   void _message(String value) => ScaffoldMessenger.of(

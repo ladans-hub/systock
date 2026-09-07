@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:convert';
 import 'package:drift/drift.dart' show InsertMode;
 import 'package:flutter/material.dart';
@@ -78,6 +79,10 @@ class _PrintingSettingsPageState extends ConsumerState<PrintingSettingsPage> {
     final result = await printer.print(receipt);
     if (!mounted) return;
     setState(() => busy = false);
+    if (result is PrintFailure) {
+      await showAppError(context, result.message);
+      return;
+    }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(

@@ -1,3 +1,5 @@
+import 'package:systock/core/widgets/error_dialog.dart';
+import 'dart:async';
 import 'package:drift/drift.dart' show Variable;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -7,6 +9,7 @@ import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
 import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/errors/result.dart';
+import 'package:systock/core/widgets/platform_controls.dart';
 import 'package:systock/features/inventory/application/inventory_ledger.dart';
 
 class InventoryRow {
@@ -20,13 +23,47 @@ class InventoryRow {
   final int quantityMilli;
 }
 
-class InventoryPage extends ConsumerWidget {
+class InventoryPage extends ConsumerStatefulWidget {
   const InventoryPage({super.key});
+
+  @override
+  ConsumerState<InventoryPage> createState() => _InventoryPageState();
+}
+
+class _InventoryPageState extends ConsumerState<InventoryPage> {
+  final _searchController = TextEditingController();
+  Timer? _debounce;
+  String _query = '';
+
+  void _search(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), () {
+      if (mounted) setState(() => _query = value.trim());
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Stream<List<InventoryRow>> rows(AppDatabase db, String company) => db
       .customSelect(
-        '''SELECT p.id,p.name product,COALESCE(u.code,'') unit,COALESCE(SUM(b.quantity_milli),0) quantity FROM products p LEFT JOIN units u ON u.id=p.unit_id LEFT JOIN inventory_balances b ON b.product_id=p.id WHERE p.company_id=? AND p.deleted_at IS NULL GROUP BY p.id,p.name,u.code ORDER BY p.name''',
-        variables: [Variable(company)],
-        readsFrom: {db.products, db.units, db.inventoryBalances},
+        '''SELECT p.id,p.name product,COALESCE(u.code,'') unit,COALESCE(SUM(b.quantity_milli),0) quantity FROM products p LEFT JOIN units u ON u.id=p.unit_id LEFT JOIN inventory_balances b ON b.product_id=p.id WHERE p.company_id=? AND p.deleted_at IS NULL AND (?='' OR lower(p.name) LIKE ? OR EXISTS(SELECT 1 FROM product_barcodes barcode WHERE barcode.product_id=p.id AND barcode.deleted_at IS NULL AND lower(barcode.barcode) LIKE ?)) GROUP BY p.id,p.name,u.code ORDER BY p.name''',
+        variables: [
+          Variable(company),
+          Variable(_query),
+          Variable('%${_query.toLowerCase()}%'),
+          Variable('%${_query.toLowerCase()}%'),
+        ],
+        readsFrom: {
+          db.products,
+          db.units,
+          db.inventoryBalances,
+          db.productBarcodes,
+        },
       )
       .map(
         (r) => InventoryRow(
@@ -38,7 +75,7 @@ class InventoryPage extends ConsumerWidget {
       )
       .watch();
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final db = ref.watch(databaseProvider);
     return Scaffold(
       appBar: AppBar(title: const LocalizedText('Stock')),
@@ -69,6 +106,23 @@ class InventoryPage extends ConsumerWidget {
                   ],
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: AdaptiveSearchField(
+                  controller: _searchController,
+                  hintText: 'Nome ou código de barras'.localized(context),
+                  onChanged: _search,
+                  trailing: IconButton(
+                    tooltip: 'Limpar pesquisa'.localized(context),
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      _debounce?.cancel();
+                      _searchController.clear();
+                      setState(() => _query = '');
+                    },
+                  ),
+                ),
+              ),
               Expanded(
                 child: StreamBuilder(
                   stream: rows(db, company.data!.id),
@@ -78,9 +132,11 @@ class InventoryPage extends ConsumerWidget {
                     }
                     final data = snapshot.data!;
                     if (data.isEmpty) {
-                      return const Center(
+                      return Center(
                         child: LocalizedText(
-                          'Cadastre produtos para controlar o stock.',
+                          _query.isEmpty
+                              ? 'Cadastre produtos para controlar o stock.'
+                              : 'Nenhum produto encontrado.',
                         ),
                       );
                     }
@@ -100,8 +156,10 @@ class InventoryPage extends ConsumerWidget {
                             ).colorScheme.primaryContainer,
                             child: ListTile(
                               leading: const Icon(Icons.inventory_outlined),
-                              title: const LocalizedText(
-                                'Quantidade geral em stock',
+                              title: LocalizedText(
+                                _query.isEmpty
+                                    ? 'Quantidade geral em stock'
+                                    : 'Stock dos produtos encontrados',
                               ),
                               trailing: Text(
                                 _quantity(total),
@@ -157,13 +215,7 @@ class InventoryPage extends ConsumerWidget {
         user = await currentSessionUser(db);
     if (products.isEmpty || warehouses.isEmpty) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: LocalizedText(
-              'Cadastre um produto e um armazém primeiro.',
-            ),
-          ),
-        );
+        showAppError(context, 'Cadastre um produto e um armazém primeiro.');
       }
       return;
     }
@@ -276,9 +328,7 @@ class InventoryPage extends ConsumerWidget {
     );
     if (context.mounted) {
       if (result case Failure(:final error)) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.userMessage)));
+        showAppFailure(context, error);
       }
     }
   }

@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -76,9 +77,7 @@ class SaleDetailPage extends ConsumerWidget {
               onPressed: () async {
                 final result = await SystemReceiptPrinter().print(receipt);
                 if (context.mounted && result is model.PrintFailure) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text(result.message)));
+                  showAppError(context, result.message);
                 }
               },
               icon: const Icon(Icons.print),
@@ -143,9 +142,7 @@ class SaleDetailPage extends ConsumerWidget {
                     case Success():
                       context.go('/sales');
                     case Failure(:final error):
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(error.userMessage)),
-                      );
+                      showAppFailure(context, error);
                   }
                 },
                 icon: const Icon(Icons.cancel_outlined),
@@ -286,14 +283,13 @@ class SaleDetailPage extends ConsumerWidget {
       deviceId: company.deviceId,
     );
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(switch (result) {
-          Success() => 'Devolução concluída.',
-          Failure(:final error) => error.userMessage,
-        }),
-      ),
-    );
+    if (result case Failure(:final error)) {
+      showAppFailure(context, error);
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Devolução concluída.')));
+    }
     if (result is Success<String>) context.go('/sales');
   }
 }

@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
 import 'package:systock/core/widgets/secure_text_field.dart';
@@ -143,25 +144,20 @@ class UsersPage extends ConsumerWidget {
     );
     if (accepted != true || !context.mounted) return;
     if (pin.text != confirmation.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: LocalizedText('Os PINs informados não são iguais.'),
-        ),
-      );
+      showAppError(context, 'Os PINs informados não são iguais.');
       return;
     }
     final result = await UserAdminService(
       db,
     ).changePin(userId: user.id, newPin: pin.text);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(switch (result) {
-          Success() => 'PIN alterado com sucesso.',
-          Failure(:final error) => error.userMessage,
-        }),
-      ),
-    );
+    if (result case Failure(:final error)) {
+      showAppFailure(context, error);
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('PIN alterado com sucesso.')));
+    }
   }
 
   Future<void> _create(BuildContext context, AppDatabase db) async {
@@ -238,10 +234,11 @@ class UsersPage extends ConsumerWidget {
       pin: pin.text,
     );
     if (!context.mounted) return;
-    final message = switch (result) {
-      Success() => 'Utilizador criado.',
-      Failure(:final error) => error.userMessage,
-    };
+    if (result case Failure(:final error)) {
+      showAppFailure(context, error);
+      return;
+    }
+    final message = 'Utilizador criado.';
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
@@ -311,13 +308,12 @@ class UsersPage extends ConsumerWidget {
       permissions: selected,
     );
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(switch (result) {
-          Success() => 'Perfil criado.',
-          Failure(:final error) => error.userMessage,
-        }),
-      ),
-    );
+    if (result case Failure(:final error)) {
+      showAppFailure(context, error);
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Perfil criado.')));
+    }
   }
 }

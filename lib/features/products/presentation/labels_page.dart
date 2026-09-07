@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
 import 'package:systock/core/widgets/platform_controls.dart';
@@ -131,11 +132,7 @@ class _LabelsPageState extends ConsumerState<LabelsPage> {
             .getSingleOrNull();
     if (!mounted) return;
     if (barcode == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: LocalizedText('Este produto não possui código de barras.'),
-        ),
-      );
+      showAppError(context, 'Este produto não possui código de barras.');
       return;
     }
     final bytes = await buildProductLabels(

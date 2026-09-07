@@ -1,4 +1,7 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'package:drift/drift.dart' show InsertMode;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,8 +33,10 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   int limit = 50;
   Timer? _debounce;
   final _scroll = ScrollController();
-  bool _nearEnd = false;
+  int _loadedProductCount = 0;
   bool gridView = false;
+  bool favoritesOnly = false;
+  final favorites = <String>{};
   bool summaryExpanded = false;
   AnalyticsPeriod period = AnalyticsPeriod.thirtyDays;
   DateTimeRange? customRange;
@@ -75,14 +80,43 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   @override
   void initState() {
     super.initState();
+    Future.microtask(_restoreFavorites);
     _scroll.addListener(() {
-      if (_scroll.position.extentAfter < 500 && !_nearEnd) {
-        _nearEnd = true;
+      if (_scroll.position.extentAfter < 500 && _loadedProductCount >= limit) {
         setState(() => limit += 50);
-      } else if (_scroll.position.extentAfter > 700) {
-        _nearEnd = false;
       }
     });
+  }
+
+  Future<void> _restoreFavorites() async {
+    final db = ref.read(databaseProvider);
+    final setting = await (db.select(
+      db.appSettings,
+    )..where((s) => s.key.equals('pos.favorites'))).getSingleOrNull();
+    if (setting == null) return;
+    try {
+      favorites.addAll(
+        (jsonDecode(setting.valueJson) as List<dynamic>).cast<String>(),
+      );
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
+  Future<void> _toggleFavorite(String productId) async {
+    setState(() {
+      if (!favorites.add(productId)) favorites.remove(productId);
+    });
+    final db = ref.read(databaseProvider);
+    await db
+        .into(db.appSettings)
+        .insert(
+          AppSettingsCompanion.insert(
+            key: 'pos.favorites',
+            valueJson: jsonEncode(favorites.toList()),
+            updatedAt: DateTime.now().toUtc(),
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
   }
 
   @override
@@ -183,22 +217,26 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
           }
           final compact = MediaQuery.sizeOf(context).width < 600;
           final showSummary = !compact || summaryExpanded;
-          return Column(
-            children: [
+          return CustomScrollView(
+            controller: _scroll,
+            slivers: [
               if (compact)
-                ListTile(
-                  leading: const Icon(Icons.analytics_outlined),
-                  title: const LocalizedText('Resumo de produtos e movimentos'),
-                  trailing: Icon(
-                    summaryExpanded ? Icons.expand_less : Icons.expand_more,
+                SliverToBoxAdapter(
+                  child: ListTile(
+                    leading: const Icon(Icons.analytics_outlined),
+                    title: const LocalizedText(
+                      'Resumo de produtos e movimentos',
+                    ),
+                    trailing: Icon(
+                      summaryExpanded ? Icons.expand_less : Icons.expand_more,
+                    ),
+                    onTap: () =>
+                        setState(() => summaryExpanded = !summaryExpanded),
                   ),
-                  onTap: () =>
-                      setState(() => summaryExpanded = !summaryExpanded),
                 ),
               if (showSummary)
-                Flexible(
-                  flex: compact ? 3 : 2,
-                  child: SingleChildScrollView(
+                SliverToBoxAdapter(
+                  child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -250,34 +288,70 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                     ),
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: AdaptiveSearchField(
-                  hintText: 'Nome ou código de barras'.localized(context),
-                  onChanged: _search,
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: AdaptiveSearchField(
+                    hintText: 'Nome ou código de barras'.localized(context),
+                    onChanged: _search,
+                  ),
                 ),
               ),
-              Expanded(
-                child: StreamBuilder<List<Product>>(
-                  stream: ProductCatalog(db).watchPage(
-                    companyId: company.id,
-                    query: search,
-                    limit: limit,
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                        value: false,
+                        label: LocalizedText('Todos'),
+                      ),
+                      ButtonSegment(
+                        value: true,
+                        icon: Icon(Icons.favorite),
+                        label: LocalizedText('Favoritos'),
+                      ),
+                    ],
+                    selected: {favoritesOnly},
+                    onSelectionChanged: (value) =>
+                        setState(() => favoritesOnly = value.first),
                   ),
-                  builder: (context, products) {
-                    if (products.hasError) {
-                      return AsyncErrorPane(onRetry: () => setState(() {}));
-                    }
-                    if (!products.hasData) {
-                      return const AsyncLoadingPane();
-                    }
-                    if (products.data!.isEmpty) {
-                      return const _Empty();
-                    }
-                    if (gridView) {
-                      return GridView.builder(
-                        controller: _scroll,
-                        padding: const EdgeInsets.all(16),
+                ),
+              ),
+              StreamBuilder<List<Product>>(
+                stream: ProductCatalog(
+                  db,
+                ).watchPage(companyId: company.id, query: search, limit: limit),
+                builder: (context, products) {
+                  if (products.hasError) {
+                    return SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: AsyncErrorPane(onRetry: () => setState(() {})),
+                    );
+                  }
+                  if (!products.hasData) {
+                    return const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: AsyncLoadingPane(),
+                    );
+                  }
+                  final visibleProducts = products.data!
+                      .where(
+                        (product) =>
+                            !favoritesOnly || favorites.contains(product.id),
+                      )
+                      .toList();
+                  _loadedProductCount = products.data!.length;
+                  if (visibleProducts.isEmpty) {
+                    return const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _Empty(),
+                    );
+                  }
+                  if (gridView) {
+                    return SliverPadding(
+                      padding: const EdgeInsets.all(16),
+                      sliver: SliverGrid.builder(
                         gridDelegate:
                             const SliverGridDelegateWithMaxCrossAxisExtent(
                               maxCrossAxisExtent: 260,
@@ -285,40 +359,50 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                               crossAxisSpacing: 12,
                               mainAxisSpacing: 12,
                             ),
-                        itemCount: products.data!.length,
+                        itemCount: visibleProducts.length,
                         itemBuilder: (_, index) => _ProductGridCard(
-                          product: products.data![index],
+                          product: visibleProducts[index],
                           currency: company.currencyCode,
+                          favorite: favorites.contains(
+                            visibleProducts[index].id,
+                          ),
+                          onFavorite: () =>
+                              _toggleFavorite(visibleProducts[index].id),
                           onOpen: () => context.go(
-                            '/products/${products.data![index].id}',
+                            '/products/${visibleProducts[index].id}',
                           ),
                           onEdit: () => context.go(
-                            '/products/${products.data![index].id}/edit',
+                            '/products/${visibleProducts[index].id}/edit',
                           ),
                           onRemove: () =>
-                              _archive(context, db, products.data![index]),
+                              _archive(context, db, visibleProducts[index]),
                         ),
-                      );
-                    }
-                    return ListView.separated(
-                      controller: _scroll,
-                      padding: const EdgeInsets.all(16),
-                      itemCount: products.data!.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) => _ProductListCard(
-                        product: products.data![index],
-                        currency: company.currencyCode,
-                        onOpen: () =>
-                            context.go('/products/${products.data![index].id}'),
-                        onEdit: () => context.go(
-                          '/products/${products.data![index].id}/edit',
-                        ),
-                        onRemove: () =>
-                            _archive(context, db, products.data![index]),
                       ),
                     );
-                  },
-                ),
+                  }
+                  return SliverPadding(
+                    padding: const EdgeInsets.all(16),
+                    sliver: SliverList.separated(
+                      itemCount: visibleProducts.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) => _ProductListCard(
+                        product: visibleProducts[index],
+                        currency: company.currencyCode,
+                        favorite: favorites.contains(visibleProducts[index].id),
+                        onFavorite: () =>
+                            _toggleFavorite(visibleProducts[index].id),
+                        onOpen: () => context.go(
+                          '/products/${visibleProducts[index].id}',
+                        ),
+                        onEdit: () => context.go(
+                          '/products/${visibleProducts[index].id}/edit',
+                        ),
+                        onRemove: () =>
+                            _archive(context, db, visibleProducts[index]),
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           );
@@ -426,6 +510,20 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
   }
 
   Future<void> _add(BuildContext context, AppDatabase db) async {
+    try {
+      await _showAddForm(context, db);
+    } catch (error) {
+      if (context.mounted) {
+        await showAppError(
+          context,
+          'Não foi possível abrir o cadastro do produto.',
+          details: error,
+        );
+      }
+    }
+  }
+
+  Future<void> _showAddForm(BuildContext context, AppDatabase db) async {
     final company = await db.select(db.companies).getSingle();
     var categories = await (db.select(
       db.categories,
@@ -443,7 +541,126 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         quantity = TextEditingController(text: '0');
     DateTime? expiresAt;
     String? categoryId, brandId, unitId = units.firstOrNull?.id, imagePath;
-    final submit = await showDialog<bool>(
+    bool saving = false;
+    Future<void> save(BuildContext dialog, StateSetter setDialogState) async {
+      if (saving) return;
+      setDialogState(() => saving = true);
+      String? savedProductId;
+      try {
+        if (name.text.trim().isEmpty) {
+          await showAppError(dialog, 'Informe o nome do produto.');
+          return;
+        }
+        if (barcode.text.trim().isEmpty) {
+          await showAppError(dialog, 'Informe o código de barras.');
+          return;
+        }
+        int minor, costMinor, wholesaleMinor;
+        try {
+          minor = price.text.trim().isEmpty ? 0 : parseMoneyMinor(price.text);
+          costMinor = cost.text.trim().isEmpty ? 0 : parseMoneyMinor(cost.text);
+          wholesaleMinor = wholesale.text.trim().isEmpty
+              ? 0
+              : parseMoneyMinor(wholesale.text);
+        } on FormatException {
+          await showAppError(dialog, 'Informe um preço válido.');
+          return;
+        }
+        if (!dialog.mounted) return;
+        if (minor < 0 || costMinor < 0 || wholesaleMinor < 0) {
+          await showAppError(dialog, 'Os preços não podem ser negativos.');
+          return;
+        }
+        if (!dialog.mounted) return;
+        final parsedQuantity = double.tryParse(
+          quantity.text.replaceAll(',', '.'),
+        );
+        if (parsedQuantity == null ||
+            !parsedQuantity.isFinite ||
+            parsedQuantity < 0) {
+          await showAppError(dialog, 'Informe uma quantidade válida.');
+          return;
+        }
+        final warehouse =
+            await (db.select(db.warehouses)
+                  ..where((w) => w.companyId.equals(company.id))
+                  ..where((w) => w.deletedAt.isNull())
+                  ..where((w) => w.active.equals(true))
+                  ..limit(1))
+                .getSingleOrNull();
+        final user = await currentSessionUser(db);
+        if (!dialog.mounted) return;
+        if (warehouse == null) {
+          await showAppError(dialog, 'Cadastre um armazém antes do produto.');
+          return;
+        }
+        final result = await ProductCatalog(db).create(
+          companyId: company.id,
+          deviceId: company.deviceId,
+          name: name.text,
+          barcode: barcode.text,
+          expiresAt: expiresAt,
+          saleMinor: minor,
+          costMinor: costMinor,
+          wholesaleMinor: wholesaleMinor,
+          categoryId: categoryId,
+          brandId: brandId,
+          unitId: unitId,
+          initialQuantityMilli: (parsedQuantity * 1000).round(),
+          warehouseId: warehouse.id,
+          userId: user.id,
+        );
+        if (!dialog.mounted) return;
+        if (result case Failure(:final error)) {
+          await showAppFailure(dialog, error);
+          return;
+        }
+        savedProductId = (result as Success<String>).value;
+        if (imagePath != null) {
+          final product = await (db.select(
+            db.products,
+          )..where((p) => p.id.equals(savedProductId!))).getSingle();
+          final imageResult = await ProductImageService(
+            db,
+          ).attach(product: product, sourcePath: imagePath!);
+          if (!dialog.mounted) return;
+          if (imageResult case Failure(:final error)) {
+            await showAppError(
+              dialog,
+              'O produto foi criado, mas a imagem não foi guardada. ${error.userMessage} Pode adicionar a imagem na edição do produto.',
+              details: error.cause,
+            );
+          }
+        }
+      } catch (error) {
+        if (dialog.mounted) {
+          await showAppError(
+            dialog,
+            savedProductId == null
+                ? 'Não foi possível concluir o cadastro do produto.'
+                : 'O produto foi criado, mas não foi possível concluir os passos seguintes. Abra o produto para verificar os dados.',
+            details: error,
+          );
+        }
+      } finally {
+        if (dialog.mounted) setDialogState(() => saving = false);
+        if (savedProductId != null && dialog.mounted) {
+          Navigator.pop(dialog, true);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Produto "${name.text.trim()}" criado com sucesso.',
+                ),
+              ),
+            );
+            context.go('/products/$savedProductId');
+          }
+        }
+      }
+    }
+
+    await showDialog<bool>(
       context: context,
       // O formulário de cadastro contém dados sensíveis; só pode ser
       // fechado explicitamente pelos botões Cancelar ou Salvar.
@@ -508,27 +725,31 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                   Row(
                     children: [
                       Expanded(
-                        child: DropdownButtonFormField<String?>(
+                        child: DropdownMenu<String>(
                           key: ValueKey(
                             'category-$categoryId-${categories.length}',
                           ),
-                          initialValue: categoryId,
-                          decoration: InputDecoration(
-                            labelText: 'Categoria'.localized(context),
-                          ),
-                          items: [
-                            const DropdownMenuItem(
-                              value: null,
-                              child: LocalizedText('Sem categoria'),
+                          initialSelection: categoryId ?? '',
+                          label: const LocalizedText('Categoria'),
+                          hintText: 'Pesquisar'.localized(context),
+                          enableFilter: true,
+                          requestFocusOnTap: true,
+                          expandedInsets: EdgeInsets.zero,
+                          menuHeight: 240,
+                          dropdownMenuEntries: [
+                            DropdownMenuEntry(
+                              value: '',
+                              label: 'Sem categoria'.localized(context),
                             ),
                             for (final c in categories)
-                              DropdownMenuItem(
-                                value: c.id,
-                                child: Text(c.name),
-                              ),
+                              DropdownMenuEntry(value: c.id, label: c.name),
                           ],
-                          onChanged: (v) =>
-                              setDialogState(() => categoryId = v),
+                          onSelected: (value) {
+                            if (value == null) return;
+                            setDialogState(
+                              () => categoryId = value.isEmpty ? null : value,
+                            );
+                          },
                         ),
                       ),
                       IconButton(
@@ -550,24 +771,29 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                   Row(
                     children: [
                       Expanded(
-                        child: DropdownButtonFormField<String?>(
+                        child: DropdownMenu<String>(
                           key: ValueKey('brand-$brandId-${brands.length}'),
-                          initialValue: brandId,
-                          decoration: InputDecoration(
-                            labelText: 'Marca'.localized(context),
-                          ),
-                          items: [
-                            const DropdownMenuItem(
-                              value: null,
-                              child: LocalizedText('Sem marca'),
+                          initialSelection: brandId ?? '',
+                          label: const LocalizedText('Marca'),
+                          hintText: 'Pesquisar'.localized(context),
+                          enableFilter: true,
+                          requestFocusOnTap: true,
+                          expandedInsets: EdgeInsets.zero,
+                          menuHeight: 240,
+                          dropdownMenuEntries: [
+                            DropdownMenuEntry(
+                              value: '',
+                              label: 'Sem marca'.localized(context),
                             ),
                             for (final b in brands)
-                              DropdownMenuItem(
-                                value: b.id,
-                                child: Text(b.name),
-                              ),
+                              DropdownMenuEntry(value: b.id, label: b.name),
                           ],
-                          onChanged: (v) => setDialogState(() => brandId = v),
+                          onSelected: (value) {
+                            if (value == null) return;
+                            setDialogState(
+                              () => brandId = value.isEmpty ? null : value,
+                            );
+                          },
                         ),
                       ),
                       IconButton(
@@ -688,97 +914,17 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialog, false),
+              onPressed: saving ? null : () => Navigator.pop(dialog, false),
               child: const LocalizedText('Cancelar'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(dialog, true),
-              child: const LocalizedText('Salvar'),
+              onPressed: saving ? null : () => save(dialog, setDialogState),
+              child: LocalizedText(saving ? 'A guardar...' : 'Salvar'),
             ),
           ],
         ),
       ),
     );
-    if (submit != true || !context.mounted) return;
-    if (barcode.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: LocalizedText('Informe o código de barras.')),
-      );
-      return;
-    }
-    int minor, costMinor, wholesaleMinor;
-    try {
-      minor = price.text.trim().isEmpty ? 0 : parseMoneyMinor(price.text);
-      costMinor = cost.text.trim().isEmpty ? 0 : parseMoneyMinor(cost.text);
-      wholesaleMinor = wholesale.text.trim().isEmpty
-          ? 0
-          : parseMoneyMinor(wholesale.text);
-    } on FormatException {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: LocalizedText('Informe um preço válido.')),
-      );
-      return;
-    }
-    final parsedQuantity = double.tryParse(quantity.text.replaceAll(',', '.'));
-    if (parsedQuantity == null || parsedQuantity < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: LocalizedText('Informe uma quantidade válida.'),
-        ),
-      );
-      return;
-    }
-    final warehouse =
-        await (db.select(db.warehouses)
-              ..where((w) => w.companyId.equals(company.id))
-              ..where((w) => w.deletedAt.isNull())
-              ..where((w) => w.active.equals(true))
-              ..limit(1))
-            .getSingleOrNull();
-    final user = await currentSessionUser(db);
-    if (warehouse == null) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: LocalizedText('Cadastre um armazém antes do produto.'),
-          ),
-        );
-      }
-      return;
-    }
-    final result = await ProductCatalog(db).create(
-      companyId: company.id,
-      deviceId: company.deviceId,
-      name: name.text,
-      barcode: barcode.text,
-      expiresAt: expiresAt,
-      saleMinor: minor,
-      costMinor: costMinor,
-      wholesaleMinor: wholesaleMinor,
-      categoryId: categoryId,
-      brandId: brandId,
-      unitId: unitId,
-      initialQuantityMilli: (parsedQuantity * 1000).round(),
-      warehouseId: warehouse.id,
-      userId: user.id,
-    );
-    if (!context.mounted) {
-      return;
-    }
-    if (result case Failure(:final error)) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error.userMessage)));
-    } else if (result case Success(:final value)) {
-      if (imagePath != null) {
-        final product = await (db.select(
-          db.products,
-        )..where((p) => p.id.equals(value))).getSingle();
-        await ProductImageService(
-          db,
-        ).attach(product: product, sourcePath: imagePath!);
-      }
-    }
   }
 
   Future<void> _export(BuildContext context, AppDatabase db) async {
@@ -803,14 +949,10 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
           case Success():
             break;
           case Failure(:final error):
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(error.userMessage)));
+            showAppFailure(context, error);
         }
       case Failure(:final error):
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.userMessage)));
+        showAppFailure(context, error);
     }
   }
 
@@ -842,9 +984,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     final result = await ProductCatalog(db).archive(product.id);
     if (!context.mounted || result is Success<void>) return;
     final failure = result as Failure<void>;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(failure.error.userMessage)));
+    showAppFailure(context, failure.error);
   }
 }
 
@@ -852,12 +992,16 @@ class _ProductListCard extends StatelessWidget {
   const _ProductListCard({
     required this.product,
     required this.currency,
+    required this.favorite,
+    required this.onFavorite,
     required this.onOpen,
     required this.onEdit,
     required this.onRemove,
   });
   final Product product;
   final String currency;
+  final bool favorite;
+  final VoidCallback onFavorite;
   final VoidCallback onOpen, onEdit, onRemove;
   @override
   Widget build(BuildContext context) => Card(
@@ -874,6 +1018,12 @@ class _ProductListCard extends StatelessWidget {
               product.saleMinor,
               symbol: currency == 'MZN' ? 'MT' : currency,
             ),
+          ),
+          IconButton(
+            onPressed: onFavorite,
+            icon: Icon(favorite ? Icons.favorite : Icons.favorite_border),
+            color: favorite ? Colors.red : null,
+            tooltip: 'Favorito'.localized(context),
           ),
           PopupMenuButton<String>(
             onSelected: (value) => value == 'remove' ? onRemove() : onEdit(),
@@ -892,12 +1042,16 @@ class _ProductGridCard extends StatelessWidget {
   const _ProductGridCard({
     required this.product,
     required this.currency,
+    required this.favorite,
+    required this.onFavorite,
     required this.onOpen,
     required this.onEdit,
     required this.onRemove,
   });
   final Product product;
   final String currency;
+  final bool favorite;
+  final VoidCallback onFavorite;
   final VoidCallback onOpen, onEdit, onRemove;
   @override
   Widget build(BuildContext context) => Card(
@@ -937,6 +1091,12 @@ class _ProductGridCard extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  onPressed: onFavorite,
+                  icon: Icon(favorite ? Icons.favorite : Icons.favorite_border),
+                  color: favorite ? Colors.red : null,
+                  tooltip: 'Favorito'.localized(context),
                 ),
                 PopupMenuButton<String>(
                   onSelected: (value) =>

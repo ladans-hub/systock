@@ -108,19 +108,55 @@ class BackupService {
       expectedChecksum: expectedChecksum,
     );
     if (validation is Failure<void>) return Failure(validation.error);
-    final current = File(currentDatabasePath),
-        safety = File(preRestoreBackupPath),
-        temporary = File('$currentDatabasePath.restore');
+    final current = File(currentDatabasePath);
+    final safety = File(preRestoreBackupPath);
+    File? temporary;
+    var stage = 'preparar a cópia do backup';
+    var originalMoved = false;
+    var databaseClosed = false;
     try {
-      await safety.parent.create(recursive: true);
-      if (await safety.exists()) {
-        await safety.delete();
-      }
-      await _db.customStatement('PRAGMA wal_checkpoint(TRUNCATE)');
-      await _db.close();
-      await current.rename(safety.path);
+      // Stage and verify before closing the live database. This also avoids
+      // depending on a removable drive during the replacement itself.
+      final stagingDirectory = await current.parent.createTemp(
+        '.systock-restore-',
+      );
+      temporary = File('${stagingDirectory.path}/database.sqlite');
       await File(backupPath).copy(temporary.path);
-      await temporary.rename(current.path);
+      final stagedValidation = await verify(
+        temporary.path,
+        expectedChecksum: expectedChecksum,
+      );
+      if (stagedValidation case Failure(:final error)) {
+        return Failure(error);
+      }
+
+      stage = 'preparar a cópia de segurança do estado atual';
+      await safety.parent.create(recursive: true);
+      if (await FileSystemEntity.type(safety.path) !=
+          FileSystemEntityType.notFound) {
+        throw FileSystemException(
+          'O destino da cópia de segurança já existe.',
+          safety.path,
+        );
+      }
+      stage = 'concluir as escritas pendentes no banco';
+      final checkpoint = await _db
+          .customSelect('PRAGMA wal_checkpoint(TRUNCATE)')
+          .getSingle();
+      if (checkpoint.read<int>('busy') != 0) {
+        throw StateError(
+          'O banco está em uso. Feche as outras instâncias do Systock e tente novamente.',
+        );
+      }
+      stage = 'fechar o banco atual';
+      await _db.close();
+      databaseClosed = true;
+      stage = 'guardar o banco atual';
+      await _renameWithRetry(current, safety.path);
+      originalMoved = true;
+      stage = 'instalar o backup';
+      await _renameWithRetry(temporary, current.path);
+      stage = 'verificar o banco restaurado';
       final restored = sqlite3.open(current.path, mode: OpenMode.readOnly);
       try {
         if (restored.select('PRAGMA integrity_check').single.values.single !=
@@ -132,20 +168,55 @@ class BackupService {
       }
       return Success(RestoreMetadata(safety.path));
     } catch (error) {
-      try {
-        if (await temporary.exists()) {
-          await temporary.delete();
+      Object? rollbackError;
+      if (originalMoved) {
+        try {
+          // Keep the safety copy even when the replacement needs rolling back.
+          final rollback = File('${temporary!.parent.path}/rollback.sqlite');
+          await safety.copy(rollback.path);
+          await _renameWithRetry(rollback, current.path);
+        } catch (failure) {
+          rollbackError = failure;
         }
-        if (!await current.exists() && await safety.exists()) {
-          await safety.copy(current.path);
-        }
-      } catch (_) {}
+      }
+      final preservation = rollbackError == null
+          ? 'O estado anterior foi preservado.'
+          : 'Não foi possível repor o estado anterior. A cópia de segurança está em: ${safety.path}.';
       return Failure(
         StorageFailure(
-          'Não foi possível restaurar. O estado anterior foi preservado.',
-          cause: error,
+          'Não foi possível restaurar ao $stage. $preservation'
+          '${databaseClosed ? " Reabra a aplicação antes de tentar novamente." : ""}',
+          cause: rollbackError == null
+              ? error
+              : 'Erro original: $error\nErro ao repor o banco: $rollbackError',
         ),
       );
+    } finally {
+      final directory = temporary?.parent;
+      if (directory != null) {
+        try {
+          await directory.delete(recursive: true);
+        } on FileSystemException {
+          // A leftover staging file must not turn a completed restore into a failure.
+        }
+      }
+    }
+  }
+
+  Future<File> _renameWithRetry(File source, String destination) async {
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return await source.rename(destination);
+      } on FileSystemException catch (error) {
+        // Windows may briefly retain handles after the database is closed.
+        final code = error.osError?.errorCode;
+        if (!Platform.isWindows ||
+            !const [5, 32, 33].contains(code) ||
+            attempt >= 5) {
+          rethrow;
+        }
+        await Future<void>.delayed(Duration(milliseconds: 100 * (attempt + 1)));
+      }
     }
   }
 }

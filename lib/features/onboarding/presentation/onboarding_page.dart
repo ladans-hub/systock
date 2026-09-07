@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -61,10 +62,15 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             'Este dispositivo já possui dados locais. Use a sincronização nas Configurações.',
           );
         case Failure(:final error):
-          _message(error.userMessage);
+          showAppFailure(context, error);
       }
     } catch (_) {
-      _message('Não foi possível conectar ao Google Drive.');
+      if (mounted) {
+        await showAppError(
+          context,
+          'Não foi possível conectar ao Google Drive.',
+        );
+      }
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -89,11 +95,14 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
   Future<void> submit() async {
     if (seller.text.trim().isEmpty || sellerUsername.text.trim().isEmpty) {
-      _message('Preencha o nome e o utilizador do vendedor.');
+      showAppError(context, 'Preencha o nome e o utilizador do vendedor.');
       return;
     }
     if (!RegExp(r'^\d{4,12}$').hasMatch(sellerPin.text)) {
-      _message('O PIN do vendedor deve conter entre 4 e 12 dígitos.');
+      showAppError(
+        context,
+        'O PIN do vendedor deve conter entre 4 e 12 dígitos.',
+      );
       return;
     }
     setState(() => saving = true);
@@ -125,9 +134,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         ref.read(sessionUserIdProvider.notifier).state = adminUser.id;
         context.go('/dashboard');
       case Failure(:final error):
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.userMessage)));
+        showAppFailure(context, error);
     }
   }
 

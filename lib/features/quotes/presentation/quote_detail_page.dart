@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -123,7 +124,9 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
       db.products,
     )..where((p) => p.deletedAt.isNull() & p.active.equals(true))).get();
     if (!mounted || products.isEmpty || currentItems.isEmpty) {
-      if (mounted) _message('Não existem itens disponíveis para editar.');
+      if (mounted) {
+        showAppError(context, 'Não existem itens disponíveis para editar.');
+      }
       return;
     }
     final existing = currentItems.first;
@@ -219,10 +222,11 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
       ],
     );
     if (!mounted) return;
-    _message(switch (result) {
-      Success() => 'Documento atualizado.',
-      Failure(:final error) => error.userMessage,
-    });
+    if (result case Failure(:final error)) {
+      showAppFailure(context, error);
+    } else {
+      _message('Documento atualizado.');
+    }
     if (result is Success<void>) setState(() {});
   }
 
@@ -253,7 +257,7 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
       case Success():
         context.go('/quotes');
       case Failure(:final error):
-        _message(error.userMessage);
+        showAppFailure(context, error);
     }
   }
 

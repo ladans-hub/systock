@@ -73,13 +73,56 @@ void main() {
         preRestoreBackupPath: safetyPath,
         expectedChecksum: metadata.checksum,
       );
-      expect(restored, isA<Success<RestoreMetadata>>());
+      expect(
+        restored,
+        isA<Success<RestoreMetadata>>(),
+        reason: restored is Failure<RestoreMetadata>
+            ? "${restored.error.userMessage} ${restored.error.cause}"
+            : null,
+      );
       expect(await File(safetyPath).exists(), isTrue);
       final reopened = AppDatabase(NativeDatabase(File(sourcePath)));
       addTearDown(reopened.close);
       expect(
         (await reopened.select(reopened.companies).getSingle()).tradeName,
         'Original',
+      );
+    },
+  );
+  test(
+    'existing safety destination is preserved and the live database remains usable',
+    () async {
+      final dir = await Directory.systemTemp.createTemp(
+        'systock-restore-failure-',
+      );
+      addTearDown(() => dir.delete(recursive: true));
+      final db = AppDatabase(
+        NativeDatabase(File('${dir.path}/current.sqlite')),
+      );
+      addTearDown(db.close);
+      await SetupCompany(db)(
+        tradeName: 'Original',
+        adminName: 'Admin',
+        username: 'admin',
+      );
+      final service = BackupService(db);
+      await service.create('${dir.path}/backup.sqlite');
+      final safety = File('${dir.path}/before.sqlite');
+      await safety.writeAsString('existing safety backup');
+      final result = await service.restore(
+        backupPath: '${dir.path}/backup.sqlite',
+        currentDatabasePath: '${dir.path}/current.sqlite',
+        preRestoreBackupPath: safety.path,
+      );
+      expect(result, isA<Failure<RestoreMetadata>>());
+      final error = (result as Failure<RestoreMetadata>).error;
+      expect(error.userMessage, contains('preparar a cópia de segurança'));
+      expect(error.cause, isA<FileSystemException>());
+      expect(await safety.readAsString(), 'existing safety backup');
+      expect((await db.select(db.companies).getSingle()).tradeName, 'Original');
+      expect(
+        await dir.list().where((entry) => entry is Directory).toList(),
+        isEmpty,
       );
     },
   );

@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:systock/l10n/localized_text.dart';
@@ -116,7 +117,7 @@ class _StartupPageState extends ConsumerState<StartupPage> {
   Future<void> _showPlansModal() => showDialog<void>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Planos e subscrições'),
+      title: const Text('Planos'),
       content: SizedBox(
         width: 430,
         child: SingleChildScrollView(
@@ -185,7 +186,7 @@ class _StartupPageState extends ConsumerState<StartupPage> {
     if (valid) {
       await _openSession(current);
     } else {
-      setState(() => error = 'PIN incorreto.');
+      await showAppError(context, 'PIN incorreto.');
     }
   }
 
@@ -217,9 +218,9 @@ class _StartupPageState extends ConsumerState<StartupPage> {
     if (ok && mounted) {
       await _openSession(user!);
     } else if (mounted) {
-      setState(
-        () => error =
-            'Não foi possível confirmar a biometria. Use o PIN ou verifique as definições do dispositivo.',
+      await showAppError(
+        context,
+        'Não foi possível confirmar a biometria. Use o PIN ou verifique as definições do dispositivo.',
       );
     }
   }
@@ -273,7 +274,7 @@ class _StartupPageState extends ConsumerState<StartupPage> {
     );
     if (accepted != true || !mounted) return;
     if (first.text != confirmation.text) {
-      setState(() => error = 'Os PINs informados não são iguais.');
+      await showAppError(context, 'Os PINs informados não são iguais.');
       return;
     }
     final result = await PinRecoveryService(
@@ -284,7 +285,7 @@ class _StartupPageState extends ConsumerState<StartupPage> {
       case Success():
         await _openSession(user!);
       case Failure(:final error):
-        setState(() => this.error = error.userMessage);
+        await showAppFailure(context, error);
     }
   }
 

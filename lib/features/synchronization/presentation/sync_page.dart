@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:drift/drift.dart' show InsertMode;
@@ -69,7 +70,7 @@ class _SyncPageState extends ConsumerState<SyncPage> {
         transport,
       ).restoreIfLocalIsFresh();
       if (recovery case Failure(:final error)) {
-        if (mounted) setState(() => lastMessage = error.userMessage);
+        if (mounted) await showAppFailure(context, error);
         return;
       }
       if (recovery case Success(value: InitialDriveRecovery.restored)) {
@@ -84,9 +85,10 @@ class _SyncPageState extends ConsumerState<SyncPage> {
       await synchronize();
     } catch (error) {
       if (mounted) {
-        setState(
-          () => lastMessage =
-              'Não foi possível conectar. Verifique a configuração OAuth da plataforma.',
+        await showAppError(
+          context,
+          'Não foi possível conectar. Verifique a configuração OAuth da plataforma.',
+          details: error,
         );
       }
     } finally {
@@ -172,6 +174,9 @@ class _SyncPageState extends ConsumerState<SyncPage> {
         Failure(:final error) => error.userMessage,
       };
     });
+    if (result case Failure(:final error)) {
+      await showAppFailure(context, error);
+    }
     if (result is Success<SyncSummary>) {
       await DriveRecoverySnapshot(
         ref.read(databaseProvider),

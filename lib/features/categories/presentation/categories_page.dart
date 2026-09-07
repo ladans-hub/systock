@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -250,7 +251,7 @@ class CategoriesPage extends ConsumerWidget {
       false;
 
   void _message(BuildContext context, String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+      showAppError(context, text);
 }
 
 class _CatalogRow {

@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -79,12 +80,9 @@ class QuotesPage extends ConsumerWidget {
     )..where((p) => p.deletedAt.isNull() & p.active.equals(true))).get();
     if (products.isEmpty || !context.mounted) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: LocalizedText(
-              'Cadastre um produto antes de criar o documento.',
-            ),
-          ),
+        showAppError(
+          context,
+          'Cadastre um produto antes de criar o documento.',
         );
       }
       return;
@@ -160,11 +158,7 @@ class QuotesPage extends ConsumerWidget {
     final q = int.tryParse(quantity.text) ?? 0;
     if (q <= 0) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: LocalizedText('Informe uma quantidade válida.'),
-          ),
-        );
+        showAppError(context, 'Informe uma quantidade válida.');
       }
       return;
     }
@@ -181,12 +175,9 @@ class QuotesPage extends ConsumerWidget {
             .getSingleOrNull();
     if (company == null || warehouse == null || user == null) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: LocalizedText(
-              'Empresa, armazém ou utilizador não configurado.',
-            ),
-          ),
+        showAppError(
+          context,
+          'Empresa, armazém ou utilizador não configurado.',
         );
       }
       return;
@@ -202,16 +193,20 @@ class QuotesPage extends ConsumerWidget {
       ],
     );
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(switch (result) {
-          Success() =>
-            kind == 'budget'
-                ? 'Orçamento guardado com sucesso.'
-                : 'Cotação guardada com sucesso.',
-          Failure(:final error) => error.userMessage,
-        }),
-      ),
-    );
+    if (result case Failure(:final error)) {
+      showAppFailure(context, error);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(switch (result) {
+            Success() =>
+              kind == 'budget'
+                  ? 'Orçamento guardado com sucesso.'
+                  : 'Cotação guardada com sucesso.',
+            Failure(:final error) => error.userMessage,
+          }),
+        ),
+      );
+    }
   }
 }

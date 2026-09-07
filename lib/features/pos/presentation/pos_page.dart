@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:drift/drift.dart' hide Column;
@@ -32,12 +33,14 @@ class _PosPageState extends ConsumerState<PosPage> {
   final cart = <String, ({Product product, int quantityMilli})>{};
   final favorites = <String>{};
   String search = '';
+  bool gridView = true;
   bool completing = false;
   Timer? searchDebounce;
   int get total => cart.values.fold(
     0,
     (s, e) => s + (e.product.saleMinor * e.quantityMilli) ~/ 1000,
   );
+  bool favoritesOnly = false;
   @override
   void initState() {
     super.initState();
@@ -88,9 +91,7 @@ class _PosPageState extends ConsumerState<PosPage> {
   }
 
   void _showCartError(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+    showAppError(context, message);
   }
 
   Future<void> _saveCart(String key) async {
@@ -256,116 +257,207 @@ class _PosPageState extends ConsumerState<PosPage> {
             return const Scaffold(body: AsyncLoadingPane());
           }
           final products = StreamBuilder<List<Product>>(
-            stream: ProductCatalog(
-              db,
-            ).watchPage(companyId: company.data!.id, query: search),
-            builder: (context, snapshot) => Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: AdaptiveSearchField(
-                    controller: searchController,
-                    hintText: 'Buscar produto / Scanner'.localized(context),
-                    onChanged: (v) {
-                      searchDebounce?.cancel();
-                      searchDebounce = Timer(
-                        const Duration(milliseconds: 250),
-                        () {
-                          if (mounted) setState(() => search = v);
-                        },
-                      );
-                    },
-                    trailing: AdaptiveIconButton(
-                      glyph: PlatformGlyph.scanner,
-                      tooltip: 'Digitalizar código'.localized(context),
-                      onPressed: () async {
-                        final code = await Navigator.push<String>(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const CameraScannerPage(),
-                          ),
+            stream: ProductCatalog(db).watchPage(
+              companyId: company.data!.id,
+              query: search,
+              limit: 1000,
+            ),
+            builder: (context, snapshot) {
+              final visibleProducts = (snapshot.data ?? const <Product>[])
+                  .where(
+                    (product) =>
+                        !favoritesOnly || favorites.contains(product.id),
+                  )
+                  .toList();
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: AdaptiveSearchField(
+                      controller: searchController,
+                      hintText: 'Buscar produto / Scanner'.localized(context),
+                      onChanged: (v) {
+                        searchDebounce?.cancel();
+                        searchDebounce = Timer(
+                          const Duration(milliseconds: 250),
+                          () {
+                            if (mounted) setState(() => search = v);
+                          },
                         );
-                        if (code != null) {
-                          searchController.text = code;
-                          setState(() => search = code);
-                        }
                       },
+                      trailing: AdaptiveIconButton(
+                        glyph: PlatformGlyph.scanner,
+                        tooltip: 'Digitalizar código'.localized(context),
+                        onPressed: () async {
+                          final code = await Navigator.push<String>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const CameraScannerPage(),
+                            ),
+                          );
+                          if (code != null) {
+                            searchController.text = code;
+                            setState(() => search = code);
+                          }
+                        },
+                      ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: GridView.builder(
-                    padding: const EdgeInsets.all(12),
-                    gridDelegate:
-                        const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 220,
-                          mainAxisExtent: 130,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                        ),
-                    itemCount: snapshot.data?.length ?? 0,
-                    itemBuilder: (_, i) {
-                      final p = snapshot.data![i];
-                      return Card(
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
-                          onTap: () => add(p),
-                          child: Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    ProductImage(
-                                      path: p.imagePath,
-                                      width: 54,
-                                      height: 54,
-                                    ),
-                                    const SizedBox(width: 9),
-                                    Expanded(
-                                      child: Text(
-                                        p.name,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                    AdaptiveIconButton(
-                                      onPressed: () => _toggleFavorite(p.id),
-                                      glyph: favorites.contains(p.id)
-                                          ? PlatformGlyph.favoriteFilled
-                                          : PlatformGlyph.favorite,
-                                      selected: favorites.contains(p.id),
-                                      tooltip: 'Favorito'.localized(context),
-                                    ),
-                                  ],
-                                ),
-                                const Spacer(),
-                                Text(
-                                  formatMoneyMinor(
-                                    p.saleMinor,
-                                    symbol: company.data!.currencyCode == 'MZN'
-                                        ? 'MT'
-                                        : company.data!.currencyCode,
-                                  ),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment(
+                            value: false,
+                            icon: Icon(Icons.apps_outlined),
+                            label: LocalizedText('Todos'),
                           ),
-                        ),
-                      );
-                    },
+                          ButtonSegment(
+                            value: true,
+                            icon: Icon(Icons.favorite),
+                            label: LocalizedText('Favoritos'),
+                          ),
+                        ],
+                        selected: {favoritesOnly},
+                        onSelectionChanged: (value) =>
+                            setState(() => favoritesOnly = value.first),
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                  Expanded(
+                    child: visibleProducts.isEmpty
+                        ? Center(
+                            child: LocalizedText(
+                              favoritesOnly
+                                  ? 'Ainda não existem produtos favoritos.'
+                                  : 'Nenhum produto encontrado.',
+                            ),
+                          )
+                        : !gridView
+                        ? ListView.separated(
+                            key: const PageStorageKey('pos-products-list'),
+                            padding: const EdgeInsets.all(12),
+                            itemCount: visibleProducts.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (_, i) {
+                              final product = visibleProducts[i];
+                              return Card(
+                                child: ListTile(
+                                  onTap: () => add(product),
+                                  leading: ProductImage(
+                                    path: product.imagePath,
+                                    width: 48,
+                                    height: 48,
+                                  ),
+                                  title: Text(product.name),
+                                  subtitle: Text(
+                                    formatMoneyMinor(
+                                      product.saleMinor,
+                                      symbol:
+                                          company.data!.currencyCode == 'MZN'
+                                          ? 'MT'
+                                          : company.data!.currencyCode,
+                                    ),
+                                  ),
+                                  trailing: AdaptiveIconButton(
+                                    onPressed: () =>
+                                        _toggleFavorite(product.id),
+                                    glyph: favorites.contains(product.id)
+                                        ? PlatformGlyph.favoriteFilled
+                                        : PlatformGlyph.favorite,
+                                    selected: favorites.contains(product.id),
+                                    tooltip: 'Favorito'.localized(context),
+                                  ),
+                                ),
+                              );
+                            },
+                          )
+                        : GridView.builder(
+                            key: const PageStorageKey('pos-products-grid'),
+                            padding: const EdgeInsets.all(12),
+                            gridDelegate:
+                                const SliverGridDelegateWithMaxCrossAxisExtent(
+                                  maxCrossAxisExtent: 220,
+                                  mainAxisExtent: 130,
+                                  crossAxisSpacing: 10,
+                                  mainAxisSpacing: 10,
+                                ),
+                            itemCount: visibleProducts.length,
+                            itemBuilder: (_, i) {
+                              final p = visibleProducts[i];
+                              return Card(
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(16),
+                                  onTap: () => add(p),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(14),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            ProductImage(
+                                              path: p.imagePath,
+                                              width: 54,
+                                              height: 54,
+                                            ),
+                                            const SizedBox(width: 9),
+                                            Expanded(
+                                              child: Text(
+                                                p.name,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                            AdaptiveIconButton(
+                                              onPressed: () =>
+                                                  _toggleFavorite(p.id),
+                                              glyph: favorites.contains(p.id)
+                                                  ? PlatformGlyph.favoriteFilled
+                                                  : PlatformGlyph.favorite,
+                                              selected: favorites.contains(
+                                                p.id,
+                                              ),
+                                              tooltip: 'Favorito'.localized(
+                                                context,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const Spacer(),
+                                        Text(
+                                          formatMoneyMinor(
+                                            p.saleMinor,
+                                            symbol:
+                                                company.data!.currencyCode ==
+                                                    'MZN'
+                                                ? 'MT'
+                                                : company.data!.currencyCode,
+                                          ),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              );
+            },
           );
           final checkout = Container(
             decoration: BoxDecoration(
@@ -508,7 +600,25 @@ class _PosPageState extends ConsumerState<PosPage> {
             ),
           );
           return Scaffold(
-            appBar: AppBar(title: const LocalizedText('Ponto de Venda')),
+            appBar: AppBar(
+              title: const LocalizedText('Ponto de Venda'),
+              actions: [
+                IconButton(
+                  onPressed: () => setState(() => gridView = false),
+                  isSelected: !gridView,
+                  icon: const Icon(Icons.view_list_outlined),
+                  selectedIcon: const Icon(Icons.view_list),
+                  tooltip: 'Ver como lista'.localized(context),
+                ),
+                IconButton(
+                  onPressed: () => setState(() => gridView = true),
+                  isSelected: gridView,
+                  icon: const Icon(Icons.grid_view_outlined),
+                  selectedIcon: const Icon(Icons.grid_view),
+                  tooltip: 'Ver como grelha'.localized(context),
+                ),
+              ],
+            ),
             body: LayoutBuilder(
               builder: (_, c) => c.maxWidth >= 900
                   ? Row(
@@ -608,20 +718,15 @@ class _PosPageState extends ConsumerState<PosPage> {
             );
           }
         case Failure(:final error):
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(error.userMessage)));
+          showAppFailure(context, error);
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              error is StateError
-                  ? error.message
-                  : 'Não foi possível finalizar a venda.',
-            ),
-          ),
+        showAppError(
+          context,
+          error is StateError
+              ? error.message
+              : 'Não foi possível finalizar a venda.',
         );
       }
     } finally {
@@ -832,13 +937,7 @@ class _PosPageState extends ConsumerState<PosPage> {
     final customers = await db.select(db.customers).get();
     if (!mounted) return null;
     if (customers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: LocalizedText(
-            'Cadastre um cliente antes de vender a crédito.',
-          ),
-        ),
-      );
+      showAppError(context, 'Cadastre um cliente antes de vender a crédito.');
       return null;
     }
     var id = customers.first.id;

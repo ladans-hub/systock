@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:drift/drift.dart' show OrderingTerm;
@@ -43,7 +44,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       temporary = File('${tempDirectory.path}/$fileName');
       final created = await BackupService(db).create(temporary.path);
       if (created case Failure<BackupMetadata>(:final error)) {
-        _message(error.userMessage);
+        if (mounted) await showAppFailure(context, error);
         return;
       }
       final metadata = (created as Success<BackupMetadata>).value;
@@ -55,7 +56,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       );
       if (!mounted) return;
       if (saved case Failure<Uri?>(:final error)) {
-        _message(error.userMessage);
+        if (mounted) await showAppFailure(context, error);
         return;
       }
       final uri = (saved as Success<Uri?>).value;
@@ -86,7 +87,13 @@ class _BackupPageState extends ConsumerState<BackupPage> {
       _message('Backup criado, validado e guardado em $savedPath');
     } catch (error, stackTrace) {
       debugPrint('Falha ao guardar backup: $error\n$stackTrace');
-      _message('Não foi possível criar ou guardar o backup.');
+      if (mounted) {
+        await showAppError(
+          context,
+          'Não foi possível criar ou guardar o backup.',
+          details: error,
+        );
+      }
     } finally {
       if (temporary != null && await temporary.exists()) {
         await temporary.delete();
@@ -102,6 +109,21 @@ class _BackupPageState extends ConsumerState<BackupPage> {
   }
 
   Future<void> restore() async {
+    try {
+      await _restore();
+    } catch (error) {
+      if (mounted) {
+        setState(() => busy = false);
+        await showAppError(
+          context,
+          'Não foi possível concluir a restauração.',
+          details: error,
+        );
+      }
+    }
+  }
+
+  Future<void> _restore() async {
     final picked = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: const ['sqlite', 'db'],
@@ -119,7 +141,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     final validation = await service.verify(path, expectedChecksum: checksum);
     if (!mounted) return;
     if (validation case Failure(:final error)) {
-      _message(error.userMessage);
+      showAppFailure(context, error);
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -158,7 +180,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
         await _restartApplication();
       case Failure(:final error):
         setState(() => busy = false);
-        _message(error.userMessage);
+        await showAppFailure(context, error);
     }
   }
 

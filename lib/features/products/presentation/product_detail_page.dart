@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' show Value, Variable;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -306,14 +307,13 @@ class ProductDetailPage extends ConsumerWidget {
       db,
     ).attach(product: product, sourcePath: file!.path!);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(switch (result) {
-          Success() => 'Imagem adicionada.',
-          Failure(:final error) => error.userMessage,
-        }),
-      ),
-    );
+    if (result case Failure(:final error)) {
+      showAppFailure(context, error);
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Imagem adicionada.')));
+    }
   }
 
   Future<void> _archive(
@@ -347,9 +347,7 @@ class ProductDetailPage extends ConsumerWidget {
       case Success():
         context.go('/products');
       case Failure(:final error):
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(error.userMessage)));
+        showAppFailure(context, error);
     }
   }
 }
@@ -473,13 +471,7 @@ class _ProductStockTab extends StatelessWidget {
     final delta = targetMilli - currentMilli;
     if (targetMilli < 0 || delta == 0 || reason.text.trim().isEmpty) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: LocalizedText(
-              'Informe uma quantidade e um motivo válidos.',
-            ),
-          ),
-        );
+        showAppError(context, 'Informe uma quantidade e um motivo válidos.');
       }
       return;
     }
@@ -498,13 +490,14 @@ class _ProductStockTab extends StatelessWidget {
       allowNegative: product.allowNegativeStock,
     );
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(switch (result) {
-          Success() => 'Quantidade atualizada com movimento de ajuste.',
-          Failure(:final error) => error.userMessage,
-        }),
-      ),
-    );
+    if (result case Failure(:final error)) {
+      showAppFailure(context, error);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Quantidade atualizada com movimento de ajuste.'),
+        ),
+      );
+    }
   }
 }

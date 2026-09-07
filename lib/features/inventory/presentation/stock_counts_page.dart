@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -119,9 +120,7 @@ class StockCountsPage extends ConsumerWidget {
         case Success(:final value):
           context.go('/inventory/counts/$value');
         case Failure(:final error):
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(error.userMessage)));
+          showAppFailure(context, error);
       }
     }
   }

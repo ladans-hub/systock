@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,19 +18,6 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
   String? error;
   bool saving = false;
   LicenseStatus? currentStatus;
-
-  List<LicensePlan> get _visiblePlans {
-    const all = LicensePlan.values;
-    final status = currentStatus;
-    if (status == null || status.trial || status.plan == null) return all;
-    final expires = status.expiresAt;
-    final nearExpiry =
-        expires != null &&
-        expires.difference(DateTime.now().toUtc()).inDays <= 7;
-    if (!status.active || nearExpiry) return all;
-    final index = all.indexOf(status.plan!);
-    return all.sublist(index);
-  }
 
   ({String label, String price, String detail, IconData icon, bool popular})
   _planData(LicensePlan plan) => switch (plan) {
@@ -92,7 +80,15 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
       );
       context.go('/');
     } on FormatException catch (e) {
-      if (mounted) setState(() => error = e.message);
+      if (mounted) await showAppError(context, e.message);
+    } catch (error) {
+      if (mounted) {
+        await showAppError(
+          context,
+          'Não foi possível ativar o plano.',
+          details: error,
+        );
+      }
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -142,7 +138,7 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
                         const Align(
                           alignment: Alignment.centerLeft,
                           child: Text(
-                            'Planos e subscrições',
+                            'Planos',
                             style: TextStyle(
                               fontSize: 30,
                               fontWeight: FontWeight.w800,
@@ -225,7 +221,7 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
                           spacing: 12,
                           runSpacing: 12,
                           children: [
-                            for (final plan in _visiblePlans)
+                            for (final plan in LicensePlan.values)
                               () {
                                 final data = _planData(plan);
                                 return _PlanCard(
@@ -325,18 +321,28 @@ class _PlanCard extends StatelessWidget {
       'Semestral' => const Color(0xFF8B5CF6),
       _ => scheme.primary,
     };
-    return Opacity(
-      opacity: current ? .58 : 1,
+    return Semantics(
+      selected: current,
       child: Container(
         width: 165,
         height: 210,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: popular ? accent.withValues(alpha: .10) : scheme.surface,
+          color: current
+              ? scheme.primaryContainer
+              : popular
+              ? accent.withValues(alpha: .10)
+              : scheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: accent.withValues(alpha: popular ? 1 : .45),
-            width: popular ? 2 : 1,
+            color: current
+                ? scheme.primary
+                : accent.withValues(alpha: popular ? 1 : .45),
+            width: current
+                ? 3
+                : popular
+                ? 2
+                : 1,
           ),
         ),
         child: Column(
@@ -357,13 +363,14 @@ class _PlanCard extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: current ? scheme.outline : accent,
+                      color: current ? scheme.primary : accent,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      current ? 'Atual' : 'Popular',
+                      current ? 'Plano atual' : 'Popular',
                       style: TextStyle(
                         fontSize: 10,
+                        color: current ? scheme.onPrimary : Colors.black,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

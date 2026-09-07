@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -79,11 +80,7 @@ class PurchaseOrdersPage extends ConsumerWidget {
         products = await db.select(db.products).get();
     if (suppliers.isEmpty || products.isEmpty || !context.mounted) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: LocalizedText('Cadastre fornecedor e produto primeiro.'),
-          ),
-        );
+        showAppError(context, 'Cadastre fornecedor e produto primeiro.');
       }
       return;
     }
@@ -156,9 +153,7 @@ class PurchaseOrdersPage extends ConsumerWidget {
       ],
     );
     if (context.mounted && result is Failure<String>) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(result.error.userMessage)));
+      showAppFailure(context, result.error);
     }
   }
 
@@ -191,14 +186,13 @@ class PurchaseOrdersPage extends ConsumerWidget {
       purchaseOrderId: order.id,
     );
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(switch (result) {
-            Success() => 'Pedido recebido e stock atualizado.',
-            Failure(:final error) => error.userMessage,
-          }),
-        ),
-      );
+      if (result case Failure(:final error)) {
+        showAppFailure(context, error);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Pedido recebido e stock atualizado.')),
+        );
+      }
     }
   }
 }
