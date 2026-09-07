@@ -72,6 +72,47 @@ extension LocalizedString on String {
 }
 
 const _english = <String, String>{
+  'Plano': 'Plan',
+  'restantes': 'remaining',
+  'dia': 'day',
+  'dias': 'days',
+  'Faltam': 'There are',
+  'faltam': 'there are',
+  'do seu período de teste. Faça upgrade para continuar sem interrupções.':
+      'of your trial period. Upgrade to continue without interruptions.',
+  'Faça upgrade para continuar sem interrupções.':
+      'Upgrade to continue without interruptions.',
+  '3 meses': '3 months',
+  '6 meses': '6 months',
+  '12 meses': '12 months',
+  'para sempre': 'forever',
+  'ativado com sucesso.': 'activated successfully.',
+  'Planos': 'Plans',
+  'Plano atual': 'Current plan',
+  'Trial': 'Trial',
+  'Trial ativo': 'Active trial',
+  'Trimestral': 'Quarterly',
+  'Semestral': 'Semiannual',
+  'Anual': 'Annual',
+  'Vitalício': 'Lifetime',
+  'Popular': 'Popular',
+  'Atual': 'Current',
+  'Para sempre': 'Forever',
+  'Ativo': 'Active',
+  'Ver planos': 'View plans',
+  'Escolha o seu plano': 'Choose your plan',
+  'Ativar plano': 'Activate plan',
+  'Insira o token UUID de ativação fornecido pelo proprietário.':
+      'Enter the activation UUID token provided by the owner.',
+  'A validar...': 'Validating...',
+  'Ativar': 'Activate',
+  'dia restante': 'day remaining',
+  'dias restantes': 'days remaining',
+  'Escolha o plano ideal para manter o seu sistema sempre ativo e atualizado.':
+      'Choose the ideal plan to keep your system active and up to date.',
+  'Escolha o plano ideal para manter o Systock sempre ativo.':
+      'Choose the ideal plan to keep Systock active.',
+  'Faça upgrade quando quiser': 'Upgrade whenever you want',
   'Configurações': 'Settings',
   'Aparência': 'Appearance',
   'Começar': 'Get started',
@@ -108,7 +149,15 @@ const _english = <String, String>{
   'Página de teste': 'Test page',
   'Imprimir página de teste': 'Print test page',
   'Código de ativação': 'Activation code',
+  'Cole aqui o código UUID': 'Paste the UUID code here',
+  'a cada 3 meses': 'every 3 months',
+  'a cada 6 meses': 'every 6 months',
+  'a cada 12 meses': 'every 12 months',
+  'pagamento único': 'one-time payment',
   'Precisa do seu código de ativação?': 'Need your activation code?',
+  'Contacte a LADANS para obter o seu código de ativação.':
+      'Contact LADANS to get your activation code.',
+  'Contactar': 'Contact',
   'Português': 'Portuguese',
   'Moçambique': 'Mozambique',
   'Por segurança, será necessário confirmar a sua identidade com a biometria deste dispositivo.':

@@ -588,13 +588,13 @@ class _UserFooter extends ConsumerWidget {
                 final status = licenseSnapshot.data;
                 if (status == null) return const SizedBox.shrink();
                 final label = status.trial
-                    ? 'Plano Trial'
-                    : 'Plano ${status.plan?.label ?? ''}';
+                    ? '${'Plano'.localized(context)} ${'Trial'.localized(context)}'
+                    : '${'Plano'.localized(context)} ${status.plan?.label.localized(context) ?? ''}';
                 final detail = status.trial
-                    ? '${status.trialDaysLeft} ${status.trialDaysLeft == 1 ? 'dia' : 'dias'} restantes'
+                    ? '${status.trialDaysLeft} ${status.trialDaysLeft == 1 ? 'dia'.localized(context) : 'dias'.localized(context)} ${'restantes'.localized(context)}'
                     : status.plan == LicensePlan.lifetime
-                    ? 'Para sempre'
-                    : 'Ativo';
+                    ? 'Para sempre'.localized(context)
+                    : 'Ativo'.localized(context);
                 return InkWell(
                   borderRadius: BorderRadius.circular(10),
                   onTap: () => context.go('/settings/plan'),

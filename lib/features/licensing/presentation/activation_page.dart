@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:systock/core/database/database_provider.dart';
 import 'package:systock/core/licensing/license_service.dart';
 import 'package:systock/core/widgets/activation_contact_banner.dart';
+import 'package:systock/l10n/localized_text.dart';
 
 class ActivationPage extends ConsumerStatefulWidget {
   const ActivationPage({super.key});
@@ -76,7 +77,12 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
       ).activate(code.text);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Plano ${plan.label} ativado com sucesso.')),
+        SnackBar(
+          content: Text(
+            '${'Plano'.localized(context)} ${plan.label.localized(context)} '
+            '${'ativado com sucesso.'.localized(context)}',
+          ),
+        ),
       );
       context.go('/');
     } on FormatException catch (e) {
@@ -137,7 +143,7 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
                         const SizedBox(height: 16),
                         const Align(
                           alignment: Alignment.centerLeft,
-                          child: Text(
+                          child: LocalizedText(
                             'Planos',
                             style: TextStyle(
                               fontSize: 30,
@@ -148,7 +154,7 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
                         const SizedBox(height: 8),
                         const Align(
                           alignment: Alignment.centerLeft,
-                          child: Text(
+                          child: LocalizedText(
                             'Escolha o plano ideal para manter o seu sistema sempre ativo e atualizado.',
                           ),
                         ),
@@ -176,8 +182,8 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
                                 Expanded(
                                   child: Text(
                                     currentStatus!.trial
-                                        ? 'Plano atual: Trial (${currentStatus!.trialDaysLeft} ${currentStatus!.trialDaysLeft == 1 ? 'dia restante' : 'dias restantes'})'
-                                        : 'Plano atual: ${currentStatus!.plan!.label}',
+                                        ? '${'Plano atual'.localized(context)}: ${'Trial'.localized(context)} (${currentStatus!.trialDaysLeft} ${currentStatus!.trialDaysLeft == 1 ? 'dia restante'.localized(context) : 'dias restantes'.localized(context)})'
+                                        : '${'Plano atual'.localized(context)}: ${currentStatus!.plan!.label.localized(context)}',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -187,7 +193,7 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
                                     currentStatus!.expiresAt != null)
                                   Text(
                                     currentStatus!.plan == LicensePlan.lifetime
-                                        ? 'Para sempre'
+                                        ? 'Para sempre'.localized(context)
                                         : '${currentStatus!.expiresAt!.day.toString().padLeft(2, '0')}/${currentStatus!.expiresAt!.month.toString().padLeft(2, '0')}/${currentStatus!.expiresAt!.year}',
                                     style: Theme.of(
                                       context,
@@ -199,7 +205,7 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
                           const SizedBox(height: 16),
                           const Align(
                             alignment: Alignment.centerLeft,
-                            child: Text(
+                            child: LocalizedText(
                               'Faça upgrade quando quiser',
                               style: TextStyle(fontWeight: FontWeight.w700),
                             ),
@@ -208,7 +214,7 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
                         ],
                         const Align(
                           alignment: Alignment.centerLeft,
-                          child: Text(
+                          child: LocalizedText(
                             'Escolha o seu plano',
                             style: TextStyle(
                               fontSize: 20,
@@ -240,7 +246,7 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
                         const SizedBox(height: 24),
                         const Align(
                           alignment: Alignment.centerLeft,
-                          child: Text(
+                          child: LocalizedText(
                             'Ativar plano',
                             style: TextStyle(
                               fontSize: 20,
@@ -249,7 +255,7 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
+                        const LocalizedText(
                           'Insira o token UUID de ativação fornecido pelo proprietário.',
                           textAlign: TextAlign.left,
                         ),
@@ -270,8 +276,11 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
                             letterSpacing: .8,
                           ),
                           decoration: InputDecoration(
-                            labelText: 'Código de ativação',
-                            errorText: error,
+                            labelText: 'Código de ativação'.localized(context),
+                            hintText: 'Cole aqui o código UUID'.localized(
+                              context,
+                            ),
+                            errorText: error?.localized(context),
                           ),
                           onSubmitted: (_) => submitActivation(),
                         ),
@@ -280,7 +289,9 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
                           width: double.infinity,
                           child: FilledButton(
                             onPressed: saving ? null : submitActivation,
-                            child: Text(saving ? 'A validar...' : 'Ativar'),
+                            child: LocalizedText(
+                              saving ? 'A validar...' : 'Ativar',
+                            ),
                           ),
                         ),
                       ],
@@ -329,14 +340,14 @@ class _PlanCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: current
-              ? scheme.primaryContainer
+              ? accent.withValues(alpha: .18)
               : popular
               ? accent.withValues(alpha: .10)
               : scheme.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: current
-                ? scheme.primary
+                ? accent
                 : accent.withValues(alpha: popular ? 1 : .45),
             width: current
                 ? 3
@@ -367,7 +378,7 @@ class _PlanCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      current ? 'Plano atual' : 'Popular',
+                      (current ? 'Plano atual' : 'Popular').localized(context),
                       style: TextStyle(
                         fontSize: 10,
                         color: current ? scheme.onPrimary : Colors.black,
@@ -380,7 +391,7 @@ class _PlanCard extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              label,
+              label.localized(context),
               style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 6),
@@ -402,7 +413,7 @@ class _PlanCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              detail,
+              detail.localized(context),
               style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
             ),
           ],

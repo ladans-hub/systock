@@ -76,18 +76,18 @@ class _StartupPageState extends ConsumerState<StartupPage> {
           context: context,
           barrierDismissible: false,
           builder: (dialogContext) => AlertDialog(
-            title: const Text('Trial ativo'),
+            title: const LocalizedText('Trial ativo'),
             content: Text(
-              'Faltam $trialDaysLeft ${trialDaysLeft == 1 ? 'dia' : 'dias'} do seu período de teste. Faça upgrade para continuar sem interrupções.',
+              '${'Faltam'.localized(context)} $trialDaysLeft ${trialDaysLeft == 1 ? 'dia'.localized(context) : 'dias'.localized(context)} ${'do seu período de teste. Faça upgrade para continuar sem interrupções.'.localized(context)}',
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Continuar'),
+                child: const LocalizedText('Continuar'),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Ver planos'),
+                child: const LocalizedText('Ver planos'),
               ),
             ],
           ),
@@ -117,14 +117,14 @@ class _StartupPageState extends ConsumerState<StartupPage> {
   Future<void> _showPlansModal() => showDialog<void>(
     context: context,
     builder: (dialogContext) => AlertDialog(
-      title: const Text('Planos'),
+      title: const LocalizedText('Planos'),
       content: SizedBox(
         width: 430,
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              const LocalizedText(
                 'Escolha o plano ideal para manter o Systock sempre ativo.',
               ),
               const SizedBox(height: 16),
@@ -146,7 +146,7 @@ class _StartupPageState extends ConsumerState<StartupPage> {
                       const SizedBox(width: 9),
                       Expanded(
                         child: Text(
-                          '${plan.$1} • ${plan.$3}',
+                          '${plan.$1.localized(context)} • ${plan.$3.localized(context)}',
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -166,7 +166,7 @@ class _StartupPageState extends ConsumerState<StartupPage> {
       actions: [
         FilledButton(
           onPressed: () => Navigator.pop(dialogContext),
-          child: const Text('Fechar'),
+          child: const LocalizedText('Fechar'),
         ),
       ],
     ),
@@ -427,13 +427,13 @@ class _StartupPageState extends ConsumerState<StartupPage> {
                                   const SizedBox(width: 9),
                                   Expanded(
                                     child: Text(
-                                      'Trial ativo: faltam $trialDaysLeft ${trialDaysLeft == 1 ? 'dia' : 'dias'}. Faça upgrade para continuar sem interrupções.',
+                                      '${'Trial ativo'.localized(context)}: ${'faltam'.localized(context)} $trialDaysLeft ${trialDaysLeft == 1 ? 'dia'.localized(context) : 'dias'.localized(context)}. ${'Faça upgrade para continuar sem interrupções.'.localized(context)}',
                                       style: const TextStyle(fontSize: 12),
                                     ),
                                   ),
                                   TextButton(
                                     onPressed: _showPlansModal,
-                                    child: const Text('Ver planos'),
+                                    child: const LocalizedText('Ver planos'),
                                   ),
                                 ],
                               ),

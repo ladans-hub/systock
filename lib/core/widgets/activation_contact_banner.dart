@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:systock/l10n/localized_text.dart';
 
 class ActivationContactBanner extends StatelessWidget {
   const ActivationContactBanner({this.onContact, super.key});
@@ -41,12 +42,12 @@ class ActivationContactBanner extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              const LocalizedText(
                 'Precisa do seu código de ativação?',
                 style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
               ),
               const SizedBox(height: 3),
-              Text(
+              LocalizedText(
                 'Contacte a LADANS para obter o seu código de ativação.',
                 style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
               ),
@@ -85,7 +86,7 @@ class ActivationContactBanner extends StatelessWidget {
               width: 22,
               height: 22,
             ),
-            label: const Text('Contactar'),
+            label: const LocalizedText('Contactar'),
             style: OutlinedButton.styleFrom(
               foregroundColor: whatsappGreen,
               side: const BorderSide(color: whatsappGreen, width: 1.5),
