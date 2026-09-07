@@ -16,6 +16,7 @@ import 'package:systock/features/onboarding/application/setup_company.dart';
 import 'package:systock/core/widgets/secure_text_field.dart';
 import 'package:systock/core/licensing/license_service.dart';
 import 'package:systock/core/widgets/activation_contact_banner.dart';
+import 'package:flutter/services.dart';
 
 class StartupPage extends ConsumerStatefulWidget {
   const StartupPage({super.key});
@@ -32,6 +33,7 @@ class _StartupPageState extends ConsumerState<StartupPage> {
   bool licenseExpired = false;
   int trialDaysLeft = 0;
   LicensePlan? expiredPlan;
+  String deviceId = '';
 
   @override
   void initState() {
@@ -47,6 +49,7 @@ class _StartupPageState extends ConsumerState<StartupPage> {
       context.go('/onboarding');
       return;
     }
+    deviceId = company.deviceId;
     final license = await LicenseService(db).status();
     if (!mounted) return;
     licenseExpired = !license.active;
@@ -188,6 +191,15 @@ class _StartupPageState extends ConsumerState<StartupPage> {
     } else {
       await showAppError(context, 'PIN incorreto.');
     }
+  }
+
+  Future<void> _copyDeviceId() async {
+    if (deviceId.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: deviceId));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('ID do dispositivo copiado'.localized(context))),
+    );
   }
 
   Future<void> _openSession(User selected) async {
@@ -392,6 +404,38 @@ class _StartupPageState extends ConsumerState<StartupPage> {
                                     ),
                                   ),
                                   const SizedBox(height: 10),
+                                  Text(
+                                    'Envie este ID para gerar o código de ativação:'
+                                        .localized(context),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: SelectableText(
+                                          deviceId,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        tooltip: 'Copiar'.localized(context),
+                                        icon: const Icon(Icons.copy_outlined),
+                                        onPressed: _copyDeviceId,
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
                                   FilledButton.icon(
                                     onPressed: () => context.go('/activation'),
                                     icon: const Icon(Icons.verified_outlined),

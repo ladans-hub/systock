@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:drift/drift.dart' show OrderingTerm;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -52,6 +53,15 @@ class _DiagnosticsPageState extends ConsumerState<DiagnosticsPage> {
       ? '${(file.lengthSync() / 1048576).toStringAsFixed(2)} MB'
       : 'Indisponível';
 
+  Future<void> _copyDeviceId(String value) async {
+    if (value.isEmpty || value == 'Não configurado') return;
+    await Clipboard.setData(ClipboardData(text: value));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('ID do dispositivo copiado'.localized(context))),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -93,7 +103,19 @@ class _DiagnosticsPageState extends ConsumerState<DiagnosticsPage> {
                 for (final entry in data!.entries)
                   ListTile(
                     title: Text(entry.key),
-                    trailing: SelectableText(entry.value),
+                    trailing: entry.key == 'Dispositivo'
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SelectableText(entry.value),
+                              IconButton(
+                                tooltip: 'Copiar'.localized(context),
+                                icon: const Icon(Icons.copy_outlined),
+                                onPressed: () => _copyDeviceId(entry.value),
+                              ),
+                            ],
+                          )
+                        : SelectableText(entry.value),
                   ),
               ],
             ),

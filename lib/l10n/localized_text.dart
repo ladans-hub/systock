@@ -158,6 +158,10 @@ const _english = <String, String>{
   'Contacte a LADANS para obter o seu código de ativação.':
       'Contact LADANS to get your activation code.',
   'Contactar': 'Contact',
+  'Copiar': 'Copy',
+  'ID do dispositivo copiado': 'Device ID copied',
+  'Envie este ID para gerar o código de ativação:':
+      'Send this ID to generate the activation code:',
   'Português': 'Portuguese',
   'Moçambique': 'Mozambique',
   'Por segurança, será necessário confirmar a sua identidade com a biometria deste dispositivo.':

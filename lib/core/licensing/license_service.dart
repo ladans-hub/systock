@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart' show InsertMode;
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
 import 'package:systock/core/database/app_database.dart';
 
 enum LicensePlan {
@@ -63,13 +62,19 @@ class LicenseService {
     }
     final now = DateTime.now().toUtc();
     final code = await _value('license.code');
+    final company = await db.select(db.companies).getSingleOrNull();
     final expiryText = await _value('license.expires_at');
     final plan = LicensePlan.fromCode(await _value('license.plan') ?? '');
     final expiry = expiryText == null ? null : DateTime.tryParse(expiryText);
     if (code != null &&
         plan != null &&
         expiry != null &&
-        verifyCode(code, plan: plan, expiresAt: expiry)) {
+        verifyCode(
+          code,
+          plan: plan,
+          expiresAt: expiry,
+          deviceId: company?.deviceId,
+        )) {
       await _touchClock(now);
       if (plan == LicensePlan.lifetime || now.isBefore(expiry)) {
         return LicenseStatus(
@@ -112,8 +117,21 @@ class LicenseService {
   Future<LicensePlan> activate(String rawCode) async {
     final code = rawCode.trim();
     final parsed = parseCode(code);
-    if (parsed == null ||
-        !verifyCode(code, plan: parsed.$1, expiresAt: parsed.$2)) {
+    final company = await db.select(db.companies).getSingleOrNull();
+    if (parsed == null || company == null) {
+      throw const FormatException('Código inválido.');
+    }
+    if (parsed.$3 != company.deviceId) {
+      throw const FormatException(
+        'Este código de ativação pertence a outro dispositivo.',
+      );
+    }
+    if (!verifyCode(
+      code,
+      plan: parsed.$1,
+      expiresAt: parsed.$2,
+      deviceId: company.deviceId,
+    )) {
       throw const FormatException('Código inválido.');
     }
     final now = DateTime.now().toUtc();
@@ -127,7 +145,11 @@ class LicenseService {
     return parsed.$1;
   }
 
-  static String generateCode(LicensePlan plan, {DateTime? now}) {
+  static String generateCode(
+    LicensePlan plan, {
+    required String deviceId,
+    DateTime? now,
+  }) {
     final date = now?.toUtc() ?? DateTime.now().toUtc();
     final expiry = plan.days == null
         ? 99999
@@ -135,13 +157,20 @@ class LicenseService {
               .add(Duration(days: plan.days!))
               .difference(DateTime.utc(1970))
               .inDays;
-    final uuid = const Uuid().v4();
+    final normalizedDeviceId = deviceId.trim();
+    if (!_isDeviceId(normalizedDeviceId)) {
+      throw ArgumentError.value(
+        deviceId,
+        'deviceId',
+        'deve ser um UUID válido',
+      );
+    }
     final payload =
-        '${plan.name}|${DateTime.utc(1970).add(Duration(days: expiry)).toIso8601String().substring(0, 10)}|$uuid';
+        '${plan.name}|${DateTime.utc(1970).add(Duration(days: expiry)).toIso8601String().substring(0, 10)}|$normalizedDeviceId';
     return '$payload|${_signature(payload).substring(0, 32)}';
   }
 
-  static (LicensePlan, DateTime)? parseCode(String code) {
+  static (LicensePlan, DateTime, String)? parseCode(String code) {
     final parts = code.split('|');
     if (parts.length != 4) return null;
     final matches = LicensePlan.values
@@ -149,22 +178,31 @@ class LicenseService {
         .toList();
     final plan = matches.isEmpty ? null : matches.first;
     final date = DateTime.tryParse(parts[1]);
-    final validUuid = RegExp(
-      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
-    ).hasMatch(parts[2]);
-    if (plan == null || date == null || !validUuid || parts[3].length != 32) {
+    if (plan == null ||
+        date == null ||
+        !_isDeviceId(parts[2]) ||
+        parts[3].length != 32) {
       return null;
     }
-    return (plan, DateTime.utc(date.year, date.month, date.day, 23, 59, 59));
+    return (
+      plan,
+      DateTime.utc(date.year, date.month, date.day, 23, 59, 59),
+      parts[2],
+    );
   }
 
   static bool verifyCode(
     String code, {
     required LicensePlan plan,
     required DateTime expiresAt,
+    String? deviceId,
   }) {
     final parts = code.split('|');
-    if (parts.length != 4 || parts[0] != plan.name) return false;
+    if (parts.length != 4 ||
+        parts[0] != plan.name ||
+        (deviceId != null && parts[2] != deviceId)) {
+      return false;
+    }
     final payload = parts.sublist(0, 3).join('|');
     return parts[3] == _signature(payload).substring(0, 32);
   }
@@ -173,6 +211,10 @@ class LicenseService {
     sha256,
     utf8.encode(_licenseSecret),
   ).convert(utf8.encode(value)).toString();
+
+  static bool _isDeviceId(String value) => RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+  ).hasMatch(value);
 
   Future<String?> _value(String key) async => (await (db.select(
     db.appSettings,

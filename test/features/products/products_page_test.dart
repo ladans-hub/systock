@@ -1,6 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:systock/core/database/app_database.dart';
@@ -46,7 +47,12 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [databaseProvider.overrideWithValue(db)],
-          child: MaterialApp.router(routerConfig: router),
+          child: MaterialApp.router(
+            routerConfig: router,
+            locale: const Locale('pt'),
+            supportedLocales: const [Locale('pt'), Locale('en')],
+            localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          ),
         ),
       );
       await tester.pumpAndSettle();
@@ -62,14 +68,14 @@ void main() {
       final barcodeField = field('Código de barras');
       await tester.ensureVisible(barcodeField);
       await tester.enterText(barcodeField, '12345678');
-      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Salvar'));
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsNWidgets(2));
       expect(
         find.textContaining('já pertence ao produto "Produto existente"'),
         findsOneWidget,
       );
-      await tester.tap(find.text('Close'));
+      await tester.tap(find.text('Fechar'));
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsOneWidget);
       expect(tester.widget<TextField>(nameField).controller!.text, 'Novo nome');
@@ -79,7 +85,7 @@ void main() {
       );
       expect(await db.select(db.products).get(), hasLength(1));
       await tester.enterText(barcodeField, '87654321');
-      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Salvar'));
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsNothing);
       final products = await db.select(db.products).get();
