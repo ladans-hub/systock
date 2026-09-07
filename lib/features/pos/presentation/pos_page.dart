@@ -316,7 +316,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                           ),
                           ButtonSegment(
                             value: true,
-                            icon: Icon(Icons.favorite),
+                            icon: Icon(Icons.star_rounded),
                             label: LocalizedText('Favoritos'),
                           ),
                         ],

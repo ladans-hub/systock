@@ -308,7 +308,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                       ),
                       ButtonSegment(
                         value: true,
-                        icon: Icon(Icons.favorite),
+                        icon: Icon(Icons.star_rounded),
                         label: LocalizedText('Favoritos'),
                       ),
                     ],
@@ -1021,8 +1021,10 @@ class _ProductListCard extends StatelessWidget {
           ),
           IconButton(
             onPressed: onFavorite,
-            icon: Icon(favorite ? Icons.favorite : Icons.favorite_border),
-            color: favorite ? Colors.red : null,
+            icon: Icon(
+              favorite ? Icons.star_rounded : Icons.star_border_rounded,
+            ),
+            color: favorite ? Colors.amber.shade700 : null,
             tooltip: 'Favorito'.localized(context),
           ),
           PopupMenuButton<String>(
@@ -1094,8 +1096,10 @@ class _ProductGridCard extends StatelessWidget {
                 ),
                 IconButton(
                   onPressed: onFavorite,
-                  icon: Icon(favorite ? Icons.favorite : Icons.favorite_border),
-                  color: favorite ? Colors.red : null,
+                  icon: Icon(
+                    favorite ? Icons.star_rounded : Icons.star_border_rounded,
+                  ),
+                  color: favorite ? Colors.amber.shade700 : null,
                   tooltip: 'Favorito'.localized(context),
                 ),
                 PopupMenuButton<String>(
