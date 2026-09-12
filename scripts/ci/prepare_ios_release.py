@@ -27,16 +27,18 @@ def prepare():
     destination = Path.home() / 'Library/Developer/Xcode/UserData/Provisioning Profiles'
     destination.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(temporary / 'systock.mobileprovision', destination / f"{profile['UUID']}.mobileprovision")
+    managed = profile.get('IsXcodeManaged', False)
     options = {
         'method': 'app-store-connect',
         'destination': 'export',
-        'signingStyle': 'manual',
+        'signingStyle': 'automatic' if managed else 'manual',
         'signingCertificate': 'Apple Distribution',
         'teamID': team,
-        'provisioningProfiles': {bundle_id: profile['UUID']},
         'manageAppVersionAndBuildNumber': False,
         'uploadSymbols': True,
     }
+    if not managed:
+        options['provisioningProfiles'] = {bundle_id: profile['UUID']}
     with (temporary / 'ExportOptions.plist').open('wb') as output:
         plistlib.dump(options, output)
     with open(os.environ['GITHUB_ENV'], 'a') as output:

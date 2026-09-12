@@ -3,6 +3,12 @@
 The `ios-release` CI job runs on pushes to main and manual workflow runs.
 It uses macOS 26 with stable Xcode 26.6, builds Flutter in release mode with
 Google defines, and exports `Systock-iOS-AppStore-release` as an IPA artifact.
+The archive is built without signing; Xcode signs it during App Store export
+using the imported distribution certificate and profile. This supports both
+Xcode-managed and manually managed App Store profiles without forcing a managed
+profile into manual signing settings during compilation or export. Export uses
+`automatic` for profiles marked `IsXcodeManaged`, and explicit manual profile
+mapping for other profiles.
 It does not upload to App Store Connect. Pull requests retain the unsigned iOS
 compilation in the `apple` job and do not receive distribution credentials.
 

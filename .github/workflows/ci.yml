@@ -15,6 +15,7 @@ jobs:
           channel: stable
           flutter-version: 3.44.8
           cache: true
+      - run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
       - run: flutter pub get
       - run: dart run build_runner build
       - run: dart format --output=none --set-exit-if-changed .
@@ -106,14 +107,17 @@ jobs:
           security list-keychains -d user -s "$keychain_path" login.keychain-db
           python3 scripts/ci/prepare_ios_release.py
       - run: flutter pub get
-      - name: Configure release signing
-        run: ruby scripts/ci/configure_ios_signing.rb
-      - name: Build App Store IPA with defines
+      - name: Archive release with defines
         run: >-
-          flutter build ipa --release
+          flutter build ipa --release --no-codesign
           --build-number=${{ github.run_number }}
           --dart-define-from-file=defines.json
-          --export-options-plist="$RUNNER_TEMP/ExportOptions.plist"
+      - name: Sign and export App Store IPA
+        run: >-
+          xcodebuild -exportArchive
+          -archivePath build/ios/archive/Runner.xcarchive
+          -exportPath build/ios/ipa
+          -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist"
       - uses: actions/upload-artifact@v4
         with:
           name: Systock-iOS-AppStore-release
