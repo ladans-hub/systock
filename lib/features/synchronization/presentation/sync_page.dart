@@ -129,8 +129,9 @@ class _SyncPageState extends ConsumerState<SyncPage>
     final saved = await DriveVaultService.binding(ref.read(databaseProvider));
     if (saved != null &&
         saved['companyId'] == company.id &&
-        saved['accountId'] == connected.accountId)
+        saved['accountId'] == connected.accountId) {
       return true;
+    }
     final claims = await vault.identity.claims();
     final existing = claims
         .where((claim) => claim.companyId == company.id)
@@ -145,8 +146,9 @@ class _SyncPageState extends ConsumerState<SyncPage>
       if (key == null) return false;
       if (await _businessRecordCount() == 0) {
         final history = await vault.backups(company.id, claimId: claim.id);
-        if (history.isEmpty)
+        if (history.isEmpty) {
           throw StateError('Não existe backup desta loja no Google Drive.');
+        }
         await vault.restore(claim, history.first, key);
         await _restartAfterRecovery();
         return false;
@@ -156,13 +158,15 @@ class _SyncPageState extends ConsumerState<SyncPage>
     }
     if (claims.isNotEmpty && await _businessRecordCount() == 0) {
       final claim = claims.first;
-      if (claim.accountId != connected.accountId)
+      if (claim.accountId != connected.accountId) {
         throw StateError('A conta Google não corresponde à loja selecionada.');
+      }
       final key = await _recoveryKeyDialog(existingBackup: true);
       if (key == null) return false;
       final history = await vault.backups(claim.companyId, claimId: claim.id);
-      if (history.isEmpty)
+      if (history.isEmpty) {
         throw StateError('Não existe backup desta loja no Google Drive.');
+      }
       await vault.restore(claim, history.first, key);
       await _restartAfterRecovery();
       return false;
@@ -192,6 +196,7 @@ class _SyncPageState extends ConsumerState<SyncPage>
 
   Future<String?> _recoveryKeyDialog({required bool existingBackup}) async {
     final generated = await VaultCipher.newRecoveryKey();
+    if (!mounted) return null;
     final controller = TextEditingController(
       text: existingBackup ? '' : generated,
     );

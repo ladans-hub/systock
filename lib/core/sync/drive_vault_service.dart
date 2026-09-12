@@ -17,7 +17,7 @@ class VaultLock {
   static Future<void> _tail = Future.value();
   static Future<T> run<T>(Future<T> Function() action) {
     final next = _tail.then((_) => action());
-    _tail = next.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    _tail = next.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     return next;
   }
 }
@@ -73,16 +73,18 @@ class DriveVaultService {
     VaultCipher.parseKey(recoveryKey);
     final company = await db.select(db.companies).getSingle();
     final saved = await binding(db);
-    if (saved != null && saved['accountId'] != accountId)
+    if (saved != null && saved['accountId'] != accountId) {
       throw StateError(
         'Esta loja está associada a outra conta Google. Volte a ligar a conta original.',
       );
+    }
     final claims = await identity.claims();
     final existing = claims.where((c) => c.companyId == company.id).toList();
-    if (existing.isNotEmpty)
+    if (existing.isNotEmpty) {
       throw StateError(
         'Esta loja já existe no Drive. Use Reconectar ou Restaurar loja existente.',
       );
+    }
     final claim = VaultClaim(
       id: const Uuid().v4(),
       companyId: company.id,
@@ -103,25 +105,28 @@ class DriveVaultService {
         final company = await db.select(db.companies).getSingle();
         final saved = await binding(db);
         if (company.id != claim.companyId ||
-            (saved != null && saved['accountId'] != accountId))
+            (saved != null && saved['accountId'] != accountId)) {
           throw StateError('A conta Google não corresponde à loja local.');
+        }
         await identity.assertWriter(claim);
         if (recoveryKey != null) {
           VaultCipher.parseKey(recoveryKey);
           final history = await backups(claim.companyId);
-          if (history.isNotEmpty)
+          if (history.isNotEmpty) {
             await VaultCipher.decrypt(
               await store.read(history.first.id),
               recoveryKey,
               claim.companyId,
             );
+          }
           await secrets.write(
             'key.${claim.companyId}.$accountId',
             recoveryKey.trim(),
           );
         }
-        if (await secrets.read('key.${claim.companyId}.$accountId') == null)
+        if (await secrets.read('key.${claim.companyId}.$accountId') == null) {
           throw StateError('Introduza a chave de recuperação desta loja.');
+        }
         await _bind(claim);
       });
   Future<void> _bind(VaultClaim claim) => setting(db, bindingSetting, {
@@ -131,8 +136,9 @@ class DriveVaultService {
   });
   Future<void> disconnect() => VaultLock.run(() async {
     final saved = await binding(db);
-    if (saved != null)
+    if (saved != null) {
       await setting(db, bindingSetting, {...saved, 'enabled': false});
+    }
   });
   Future<List<VaultFile>> backups(String companyId, {String? claimId}) =>
       store.list(
@@ -141,26 +147,30 @@ class DriveVaultService {
 
   Future<String> synchronize({bool force = false}) => VaultLock.run(() async {
     final saved = await binding(db);
-    if (saved == null || saved['enabled'] != true)
+    if (saved == null || saved['enabled'] != true) {
       throw StateError('Ligue esta loja ao Google Drive antes de sincronizar.');
-    if (saved['accountId'] != accountId)
+    }
+    if (saved['accountId'] != accountId) {
       throw StateError(
         'A conta Google mudou. O envio foi bloqueado para proteger os dados.',
       );
+    }
     final claim = VaultClaim.fromJson(saved);
     final company = await (db.select(
       db.companies,
     )..where((row) => row.id.equals(claim.companyId))).getSingleOrNull();
-    if (company == null)
+    if (company == null) {
       throw StateError(
         'A loja local não corresponde à associação Google Drive.',
       );
+    }
     await identity.assertWriter(claim);
     final key = await secrets.read('key.${claim.companyId}.$accountId');
-    if (key == null)
+    if (key == null) {
       throw StateError(
         'Chave indisponível. Volte a ligar a conta com a chave de recuperação.',
       );
+    }
     final backup = await VaultBackup(
       db,
       documents,
@@ -174,8 +184,9 @@ class DriveVaultService {
     if (!force &&
         last?['fingerprint'] == backup.fingerprint &&
         last?['claimId'] == claim.id &&
-        (await backups(claim.companyId, claimId: claim.id)).isNotEmpty)
+        (await backups(claim.companyId, claimId: claim.id)).isNotEmpty) {
       return 'Os dados já estão atualizados no Drive.';
+    }
     final encrypted = await VaultCipher.encrypt(
       backup.bytes,
       key,
@@ -233,10 +244,12 @@ class DriveVaultService {
       source.companyId,
       accountId,
     );
-    if (source.id != currentClaim.id)
+    if (source.id != currentClaim.id) {
       throw StateError('A caixa principal mudou. Atualize a lista de lojas.');
-    if (!(await backups(source.companyId)).any((f) => f.id == backup.id))
+    }
+    if (!(await backups(source.companyId)).any((f) => f.id == backup.id)) {
       throw StateError('O backup não pertence à loja selecionada.');
+    }
     final local = await db.select(db.companies).getSingleOrNull();
     if (local != null && local.id != source.companyId) {
       final count = await db
@@ -244,10 +257,11 @@ class DriveVaultService {
             'SELECT (SELECT COUNT(*) FROM products) + (SELECT COUNT(*) FROM sales) + (SELECT COUNT(*) FROM purchases) + (SELECT COUNT(*) FROM inventory_movements) + (SELECT COUNT(*) FROM customers) + (SELECT COUNT(*) FROM suppliers) AS total',
           )
           .getSingle();
-      if (count.read<int>('total') > 0)
+      if (count.read<int>('total') > 0) {
         throw StateError(
           'Já existem dados de outra loja neste dispositivo. Use uma instalação vazia para restaurar.',
         );
+      }
     }
     final clear = await VaultCipher.decrypt(
       await store.read(backup.id),
@@ -273,8 +287,9 @@ class DriveVaultService {
         source.companyId,
         accountId,
       );
-      if (recheck.id != source.id)
+      if (recheck.id != source.id) {
         throw StateError('Outra transferência está em curso. Tente novamente.');
+      }
       await secrets.write(
         'key.${claim.companyId}.$accountId',
         recoveryKey.trim(),
@@ -296,7 +311,7 @@ class DriveVaultService {
           ],
         );
       } finally {
-        staged.dispose();
+        staged.close();
       }
       final result = await BackupService(db).restore(
         backupPath: prepared.path,
@@ -304,8 +319,9 @@ class DriveVaultService {
         preRestoreBackupPath:
             '${documents.path}/backups/pre-drive-${const Uuid().v4()}.sqlite',
       );
-      if (result case Failure(:final error))
+      if (result case Failure(:final error)) {
         throw StateError(error.userMessage);
+      }
     } finally {
       await prepared.parent.delete(recursive: true);
     }

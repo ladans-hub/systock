@@ -42,8 +42,9 @@ class VaultClaim {
     'parent': parent,
   };
   factory VaultClaim.fromJson(Map<String, dynamic> j) {
-    if (j['schema'] != 2)
+    if (j['schema'] != 2) {
       throw const FormatException('Formato de associação não suportado.');
+    }
     return VaultClaim(
       id: j['id'] as String,
       companyId: j['companyId'] as String,
@@ -73,11 +74,14 @@ class DriveVaultIdentity {
       final claim = VaultClaim.fromJson(
         decodeVaultJson(await store.read(file.id)),
       );
-      if (file.name != 'systock-v2-claim-${claim.id}.json')
+      if (file.name != 'systock-v2-claim-${claim.id}.json') {
         throw StateError('Associação inválida no Drive.');
+      }
       if (result.containsKey(claim.id) &&
-          jsonEncode(result[claim.id]!.toJson()) != jsonEncode(claim.toJson()))
+          jsonEncode(result[claim.id]!.toJson()) !=
+              jsonEncode(claim.toJson())) {
         throw StateError('Associações inconsistentes no Drive.');
+      }
       result[claim.id] = claim;
     }
     return result.values.toList();
@@ -90,13 +94,15 @@ class DriveVaultIdentity {
     String accountId,
   ) {
     final chain = all.where((c) => c.companyId == companyId).toList();
-    if (chain.isEmpty || chain.any((c) => c.accountId != accountId))
+    if (chain.isEmpty || chain.any((c) => c.accountId != accountId)) {
       throw StateError('A conta Google não corresponde à loja.');
+    }
     final roots = chain.where((c) => c.parent == null).toList();
-    if (roots.length != 1)
+    if (roots.length != 1) {
       throw StateError(
         'Há associações concorrentes. A sincronização foi suspensa; contacte o suporte.',
       );
+    }
     var current = roots.single;
     final seen = <String>{};
     while (seen.add(current.id)) {
@@ -119,8 +125,9 @@ class DriveVaultIdentity {
       utf8.encode(jsonEncode(claim.toJson())),
     );
     final current = active(await claims(), claim.companyId, claim.accountId);
-    if (current.id != claim.id)
+    if (current.id != claim.id) {
       throw StateError('A caixa principal mudou. Volte a ligar a loja.');
+    }
   }
 
   Future<void> assertWriter(VaultClaim expected) async {

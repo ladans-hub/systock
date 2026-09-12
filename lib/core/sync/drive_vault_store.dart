@@ -70,8 +70,9 @@ class GoogleDriveVaultStore implements DriveVaultStore {
     // Retrying by a unique name also handles an upload whose response was lost.
     return retry(() async {
       final existing = await list(name);
-      if (existing.any((f) => f.name == name))
+      if (existing.any((f) => f.name == name)) {
         return existing.firstWhere((f) => f.name == name).id;
+      }
       final file = await api.files.create(
         drive.File(
           name: name,

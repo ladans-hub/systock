@@ -8,8 +8,9 @@ class VaultCipher {
       base64UrlEncode(await (await algorithm.newSecretKey()).extractBytes());
   static SecretKey parseKey(String text) {
     final bytes = base64Url.decode(text.trim());
-    if (bytes.length != 32)
+    if (bytes.length != 32) {
       throw const FormatException('A chave de recuperação é inválida.');
+    }
     return SecretKey(bytes);
   }
 
@@ -39,8 +40,9 @@ class VaultCipher {
     String companyId,
   ) async {
     final j = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
-    if (j['version'] != 2)
+    if (j['version'] != 2) {
       throw const FormatException('Versão de backup não suportada.');
+    }
     final plain = await algorithm.decrypt(
       SecretBox(
         base64Decode(j['data'] as String),

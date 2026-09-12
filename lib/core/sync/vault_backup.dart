@@ -18,8 +18,9 @@ class VaultBackup {
     try {
       final path = '${temp.path}/store.sqlite';
       final result = await BackupService(db).create(path);
-      if (result case Failure(:final error))
+      if (result case Failure(:final error)) {
         throw StateError(error.userMessage);
+      }
       final copy = sqlite3.open(path);
       final images = <String, String>{};
       late List<String> operations;
@@ -66,12 +67,13 @@ class VaultBackup {
         final companyRows = companyId == null
             ? copy.select('SELECT id FROM companies')
             : copy.select('SELECT id FROM companies WHERE id = ?', [companyId]);
-        if (companyRows.length != 1)
+        if (companyRows.length != 1) {
           throw StateError(
             companyId == null
                 ? 'Não foi possível identificar a loja local no backup.'
                 : 'A loja local não corresponde à associação Google Drive.',
           );
+        }
         final company = companyRows.single['id'] as String;
         final sqliteBytes = await File(path).readAsBytes();
         final payload = {
@@ -100,7 +102,7 @@ class VaultBackup {
             .toString();
         return (bytes: bytes, fingerprint: fingerprint, operations: operations);
       } finally {
-        copy.dispose();
+        copy.close();
       }
     } finally {
       await temp.delete(recursive: true);
@@ -119,8 +121,9 @@ class VaultBackup {
       );
     }
     final database = base64Decode(payload['database'] as String);
-    if (sha256.convert(database).toString() != payload['checksum'])
+    if (sha256.convert(database).toString() != payload['checksum']) {
       throw StateError('O backup está corrompido.');
+    }
     final temp = await Directory.systemTemp.createTemp(
       'systock-restore-drive-',
     );
@@ -130,26 +133,30 @@ class VaultBackup {
       final verified = await BackupService(
         db,
       ).verify(target.path, expectedChecksum: payload['checksum'] as String);
-      if (verified case Failure(:final error))
+      if (verified case Failure(:final error)) {
         throw StateError(error.userMessage);
+      }
       final restored = sqlite3.open(target.path);
       try {
         if (restored.select('PRAGMA user_version').single.values.single !=
                 schema ||
             restored.select('SELECT id FROM companies').single['id'] !=
-                companyId)
+                companyId) {
           throw StateError('Identidade do backup inválida.');
+        }
         final assetDir = Directory(
           '${documents.path}/recovered-assets/${const Uuid().v4()}',
         );
         final images = payload['images'] as Map<String, dynamic>;
         if (images.isNotEmpty) await assetDir.create(recursive: true);
         for (final entry in images.entries) {
-          if (!RegExp(r'^[a-f0-9]{64}\.[a-z0-9]{1,8}$').hasMatch(entry.key))
+          if (!RegExp(r'^[a-f0-9]{64}\.[a-z0-9]{1,8}$').hasMatch(entry.key)) {
             throw StateError('Nome de imagem inválido no backup.');
+          }
           final imageBytes = base64Decode(entry.value as String);
-          if (!entry.key.startsWith(sha256.convert(imageBytes).toString()))
+          if (!entry.key.startsWith(sha256.convert(imageBytes).toString())) {
             throw StateError('Imagem corrompida.');
+          }
           final image = File('${assetDir.path}/${entry.key}');
           await image.writeAsBytes(imageBytes, flush: true);
           for (final table in ['products', 'companies']) {
@@ -164,7 +171,7 @@ class VaultBackup {
           "DELETE FROM app_settings WHERE key LIKE 'sync.%' OR key='session.current_user'",
         );
       } finally {
-        restored.dispose();
+        restored.close();
       }
       return target;
     } catch (_) {

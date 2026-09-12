@@ -23,10 +23,11 @@ class DesktopGoogleAuth {
   ).replaceAll('=', '');
 
   Future<({String token, String accountId, String email})> connect() async {
-    if (clientId.isEmpty)
+    if (clientId.isEmpty) {
       throw StateError(
         'A ligação Google Drive ainda não está configurada nesta versão do Systock. Contacte o fornecedor.',
       );
+    }
     final verifier = randomToken(), state = randomToken();
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final redirect = 'http://127.0.0.1:${server.port}/oauth2callback';
@@ -71,12 +72,13 @@ class DesktopGoogleAuth {
       final codeFuture = completion.future.timeout(const Duration(minutes: 3));
       // Attach a handler before opening the browser, including early failures.
       unawaited(
-        codeFuture.then<void>((_) {}, onError: (Object _, StackTrace __) {}),
+        codeFuture.then<void>((_) {}, onError: (Object _, StackTrace _) {}),
       );
-      if (!await launchUrl(uri, mode: LaunchMode.externalApplication))
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
         throw StateError(
           'Não foi possível abrir o navegador para ligar o Google Drive.',
         );
+      }
       final code = await codeFuture;
       final tokens = await _exchange({
         'grant_type': 'authorization_code',
@@ -85,10 +87,11 @@ class DesktopGoogleAuth {
         'redirect_uri': redirect,
       });
       final refresh = tokens['refresh_token'] as String?;
-      if (refresh == null)
+      if (refresh == null) {
         throw StateError(
           'Autorize o acesso offline ao Google Drive e tente novamente.',
         );
+      }
       final result = await _identity(tokens['access_token'] as String);
       await secrets.write(
         'oauth',
@@ -116,10 +119,11 @@ class DesktopGoogleAuth {
       'refresh_token': saved['refreshToken'] as String,
     });
     final result = await _identity(tokens['access_token'] as String);
-    if (result.accountId != saved['accountId'])
+    if (result.accountId != saved['accountId']) {
       throw StateError(
         'A identidade da conta Google mudou. Volte a ligar a conta.',
       );
+    }
     return result;
   }
 
@@ -155,10 +159,11 @@ class DesktopGoogleAuth {
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final granted = (data['scope'] as String?)?.split(' ');
     if (granted != null &&
-        !granted.contains('https://www.googleapis.com/auth/drive.appdata'))
+        !granted.contains('https://www.googleapis.com/auth/drive.appdata')) {
       throw StateError(
         'É necessário autorizar a pasta privada do Systock no Drive.',
       );
+    }
     return data;
   }
 
@@ -171,8 +176,9 @@ class DesktopGoogleAuth {
           headers: {'Authorization': 'Bearer $token'},
         )
         .timeout(const Duration(seconds: 30));
-    if (response.statusCode != 200)
+    if (response.statusCode != 200) {
       throw StateError('Não foi possível verificar a conta Google.');
+    }
     final value = jsonDecode(response.body) as Map<String, dynamic>;
     return (
       token: token,
