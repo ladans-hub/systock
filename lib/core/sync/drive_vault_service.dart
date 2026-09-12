@@ -148,9 +148,9 @@ class DriveVaultService {
         'A conta Google mudou. O envio foi bloqueado para proteger os dados.',
       );
     final claim = VaultClaim.fromJson(saved);
-    final company = await (db.select(db.companies)
-          ..where((row) => row.id.equals(claim.companyId)))
-        .getSingleOrNull();
+    final company = await (db.select(
+      db.companies,
+    )..where((row) => row.id.equals(claim.companyId))).getSingleOrNull();
     if (company == null)
       throw StateError(
         'A loja local não corresponde à associação Google Drive.',

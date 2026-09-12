@@ -81,7 +81,7 @@ class GoogleDriveVaultStore implements DriveVaultStore {
         uploadMedia: drive.Media(Stream.value(bytes), bytes.length),
         $fields: 'id',
       );
-        return file.id!;
+      return file.id!;
     });
   }
 
