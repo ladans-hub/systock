@@ -1,9 +1,10 @@
 import 'package:systock/core/widgets/error_dialog.dart';
+import 'dart:async';
 import 'dart:io';
+import 'package:systock/app/bootstrap/app_restart_scope.dart';
 
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:systock/core/database/database_provider.dart';
@@ -32,11 +33,33 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       sellerPin = TextEditingController(text: '1234');
   String currency = 'MZN';
   bool saving = false;
+  String? recoveryStage;
 
   Future<void> recoverFromDrive() async {
-    setState(() => saving = true);
+    if (saving) return;
+    setState(() {
+      saving = true;
+      recoveryStage = 'A ligar ao Google…';
+    });
+    GoogleDriveSession? session;
     try {
-      final session = await GoogleDriveAuthService.instance.connect();
+      final connection = GoogleDriveAuthService.instance.connect();
+      var expired = false;
+      // Dispose a late connection instead of leaking its HTTP client.
+      unawaited(
+        connection.then<void>((value) {
+          if (expired) value.client.close();
+        }, onError: (Object _, StackTrace _) {}),
+      );
+      session = await connection.timeout(
+        const Duration(minutes: 2),
+        onTimeout: () {
+          expired = true;
+          throw TimeoutException('A ligação ao Google demorou demasiado.');
+        },
+      );
+      if (!mounted) return;
+      setState(() => recoveryStage = 'A recuperar os dados…');
       final result = await DriveRecoverySnapshot(
         ref.read(databaseProvider),
         GoogleDriveSyncTransport(session.client),
@@ -52,7 +75,10 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
             );
             exit(0);
           }
-          await SystemNavigator.pop();
+          setState(() => recoveryStage = 'A abrir os dados recuperados…');
+          final router = GoRouter.of(context);
+          await AppRestartScope.restart(context);
+          router.go('/');
         case Success(value: InitialDriveRecovery.noRemoteSnapshot):
           _message(
             'Esta conta ainda não possui dados do Systock no Google Drive.',
@@ -64,6 +90,13 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         case Failure(:final error):
           showAppFailure(context, error);
       }
+    } on TimeoutException {
+      if (mounted) {
+        await showAppError(
+          context,
+          'A ligação ao Google demorou demasiado. Verifique a Internet e tente novamente.',
+        );
+      }
     } catch (_) {
       if (mounted) {
         await showAppError(
@@ -72,7 +105,13 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         );
       }
     } finally {
-      if (mounted) setState(() => saving = false);
+      session?.client.close();
+      if (mounted) {
+        setState(() {
+          saving = false;
+          recoveryStage = null;
+        });
+      }
     }
   }
 
@@ -239,14 +278,18 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
                   const SizedBox(height: 24),
                   FilledButton(
                     onPressed: saving ? null : submit,
-                    child: Text(saving ? 'A configurar…' : 'Começar'),
+                    child: Text(
+                      saving && recoveryStage == null
+                          ? 'A configurar…'
+                          : 'Começar',
+                    ),
                   ),
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: saving ? null : recoverFromDrive,
                     icon: const Icon(Icons.cloud_download_outlined),
-                    label: const LocalizedText(
-                      'Recuperar da minha Conta Google',
+                    label: LocalizedText(
+                      recoveryStage ?? 'Recuperar da minha Conta Google',
                     ),
                   ),
                   const SizedBox(height: 8),

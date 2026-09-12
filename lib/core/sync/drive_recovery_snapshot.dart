@@ -50,7 +50,9 @@ class DriveRecoverySnapshot {
       if (localRecords > 0) {
         return const Success(InitialDriveRecovery.localDataPresent);
       }
-      final remote = await transport.downloadRecoverySnapshot();
+      final remote = await transport.downloadRecoverySnapshot().timeout(
+        const Duration(minutes: 2),
+      );
       if (remote == null) {
         return const Success(InitialDriveRecovery.noRemoteSnapshot);
       }
