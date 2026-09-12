@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/action_colors.dart';
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
@@ -65,6 +66,7 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
               IconButton(
                 tooltip: 'Apagar'.localized(context),
                 onPressed: () => _archive(db, data.quote),
+                color: removalActionColor,
                 icon: const Icon(Icons.delete_outline),
               ),
             ],
@@ -244,6 +246,10 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
             child: const LocalizedText('Cancelar'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: removalActionColor,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(dialog, true),
             child: const LocalizedText('Apagar'),
           ),

@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/action_colors.dart';
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart' as adaptive;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -18,7 +19,7 @@ enum PlatformGlyph {
   logout,
 }
 
-class AdaptiveSearchField extends StatelessWidget {
+class AdaptiveSearchField extends StatefulWidget {
   const AdaptiveSearchField({
     required this.hintText,
     required this.onChanged,
@@ -34,42 +35,75 @@ class AdaptiveSearchField extends StatelessWidget {
   final bool autofocus;
 
   @override
-  Widget build(BuildContext context) => Container(
-    height: 44,
-    decoration: BoxDecoration(
-      color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-    ),
-    child: Row(
-      children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 14, right: 8),
-          child: AdaptiveIcon(PlatformGlyph.search, size: 18),
-        ),
-        Expanded(
-          child: adaptive.AdaptiveTextField(
-            controller: controller,
-            autofocus: autofocus,
-            placeholder: hintText,
-            padding: EdgeInsets.zero,
-            decoration: InputDecoration(
-              filled: false,
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
+  State<AdaptiveSearchField> createState() => _AdaptiveSearchFieldState();
+}
+
+class _AdaptiveSearchFieldState extends State<AdaptiveSearchField> {
+  final _internalController = TextEditingController();
+  TextEditingController get _controller =>
+      widget.controller ?? _internalController;
+
+  @override
+  void dispose() {
+    _internalController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      ValueListenableBuilder<TextEditingValue>(
+        valueListenable: _controller,
+        builder: (context, value, _) => Container(
+          height: 44,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
             ),
-            cupertinoDecoration: const BoxDecoration(color: Colors.transparent),
-            onChanged: onChanged,
+          ),
+          child: Row(
+            children: [
+              const Padding(
+                padding: EdgeInsets.only(left: 14, right: 8),
+                child: AdaptiveIcon(PlatformGlyph.search, size: 18),
+              ),
+              Expanded(
+                child: adaptive.AdaptiveTextField(
+                  controller: _controller,
+                  autofocus: widget.autofocus,
+                  placeholder: widget.hintText,
+                  padding: EdgeInsets.zero,
+                  decoration: InputDecoration(
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  cupertinoDecoration: const BoxDecoration(
+                    color: Colors.transparent,
+                  ),
+                  onChanged: widget.onChanged,
+                ),
+              ),
+              if (value.text.isNotEmpty)
+                IconButton(
+                  tooltip: 'Limpar pesquisa'.localized(context),
+                  icon: const Icon(Icons.clear, size: 18),
+                  onPressed: () {
+                    _controller.clear();
+                    widget.onChanged('');
+                  },
+                ),
+              ?widget.trailing,
+              if (widget.trailing != null || value.text.isNotEmpty)
+                const SizedBox(width: 4),
+            ],
           ),
         ),
-        ?trailing,
-        if (trailing != null) const SizedBox(width: 4),
-      ],
-    ),
-  );
+      );
 }
 
 class AdaptiveIcon extends StatelessWidget {
@@ -143,19 +177,27 @@ class AdaptiveIconButton extends StatelessWidget {
     required this.onPressed,
     this.tooltip,
     this.selected = false,
+    this.destructive = false,
     super.key,
   });
   final PlatformGlyph glyph;
   final VoidCallback? onPressed;
   final String? tooltip;
   final bool selected;
+  final bool destructive;
 
   @override
   Widget build(BuildContext context) {
     final platform = Theme.of(context).platform;
     final icon = AdaptiveIcon(
       glyph,
-      color: selected ? const Color(0xFFF4B740) : null,
+      color: destructive
+          ? (onPressed == null
+                ? Theme.of(context).disabledColor
+                : removalActionColor)
+          : selected
+          ? const Color(0xFFF4B740)
+          : null,
     );
     if (platform == TargetPlatform.windows) {
       return Tooltip(

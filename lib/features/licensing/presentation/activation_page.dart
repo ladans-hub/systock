@@ -24,28 +24,28 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
   _planData(LicensePlan plan) => switch (plan) {
     LicensePlan.quarterly => (
       label: 'Trimestral',
-      price: '349,00 MT',
+      price: '449,00 MT',
       detail: 'a cada 3 meses',
       icon: Icons.eco_outlined,
       popular: false,
     ),
     LicensePlan.semiannual => (
       label: 'Semestral',
-      price: '649,00 MT',
+      price: '849,00 MT',
       detail: 'a cada 6 meses',
       icon: Icons.diamond_outlined,
       popular: false,
     ),
     LicensePlan.annual => (
       label: 'Anual',
-      price: '1.199,00 MT',
+      price: '1.499,00 MT',
       detail: 'a cada 12 meses',
       icon: Icons.star_rounded,
       popular: true,
     ),
     LicensePlan.lifetime => (
       label: 'Vitalício',
-      price: '3.499,00 MT',
+      price: '4.999,00 MT',
       detail: 'pagamento único',
       icon: Icons.all_inclusive,
       popular: false,

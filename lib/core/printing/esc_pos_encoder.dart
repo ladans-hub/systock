@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:systock/core/utils/quantity.dart';
 import 'dart:typed_data';
 import 'package:systock/core/printing/receipt.dart';
 import 'package:systock/core/utils/money.dart';
@@ -29,6 +30,10 @@ class EscPosEncoder {
     out.addAll(latin1.encode('${'-' * charactersPerLine}\n'));
     for (final item in r.lines) {
       line(item.description, _money(item.totalMinor));
+      line(
+        '${formatQuantity(item.quantityMilli)} x ${_money(item.unitPriceMinor)}',
+        '',
+      );
     }
     out.addAll(latin1.encode('${'-' * charactersPerLine}\n'));
     line('TOTAL', _money(r.totalMinor));

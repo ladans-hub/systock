@@ -74,7 +74,8 @@ class GlobalSearchDelegate extends SearchDelegate<GlobalSearchResult?> {
   String get searchFieldLabel => 'Produto, cliente, venda, compra…';
   @override
   List<Widget> buildActions(BuildContext context) => [
-    IconButton(onPressed: () => query = '', icon: const Icon(Icons.clear)),
+    if (query.isNotEmpty)
+      IconButton(onPressed: () => query = '', icon: const Icon(Icons.clear)),
   ];
   @override
   Widget buildLeading(BuildContext context) =>

@@ -111,6 +111,9 @@ class SetupCompany {
                   id: _uuid.v7(),
                   companyId: companyId,
                   code: unit.$1,
+                  decimalPlaces: Value(
+                    const {'KG', 'L'}.contains(unit.$1) ? 3 : 0,
+                  ),
                   name: unit.$2,
                   createdAt: now,
                   updatedAt: now,

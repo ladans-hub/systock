@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/action_colors.dart';
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Variable;
 import 'package:flutter/material.dart';
@@ -236,7 +237,10 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
                     ),
                     DropdownMenuItem(
                       value: 'remove',
-                      child: LocalizedText('Remover'),
+                      child: LocalizedText(
+                        'Remover',
+                        style: TextStyle(color: removalActionColor),
+                      ),
                     ),
                     DropdownMenuItem(
                       value: 'set',

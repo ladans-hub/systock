@@ -31,6 +31,7 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/defines.json
 /coverage/
 /Systock-Windows-release.zip
 /Systock-Setup.exe

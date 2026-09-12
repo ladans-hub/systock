@@ -7,7 +7,11 @@ abstract interface class OAuthTokenStore {
 }
 
 class SecureOAuthTokenStore implements OAuthTokenStore {
-  const SecureOAuthTokenStore([this._storage = const FlutterSecureStorage()]);
+  const SecureOAuthTokenStore([
+    this._storage = const FlutterSecureStorage(
+      mOptions: MacOsOptions(usesDataProtectionKeychain: false),
+    ),
+  ]);
   final FlutterSecureStorage _storage;
   static const _key = 'google_drive_refresh_token';
   @override

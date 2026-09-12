@@ -453,6 +453,10 @@ class ProductCatalog {
     required bool active,
     required String? barcode,
     DateTime? expiresAt,
+    int? quantityMilli,
+    int? expectedQuantityMilli,
+    String? warehouseId,
+    String? userId,
   }) async {
     if (name.trim().isEmpty ||
         [
@@ -463,8 +467,49 @@ class ProductCatalog {
         ].any((value) => value < 0)) {
       return const Failure(ValidationFailure('Informe nome e preços válidos.'));
     }
+    if (quantityMilli != null &&
+        (quantityMilli < 0 ||
+            warehouseId == null ||
+            userId == null ||
+            expectedQuantityMilli == null)) {
+      return const Failure(
+        ValidationFailure('Informe quantidade e armazém válidos.'),
+      );
+    }
     try {
       await _db.transaction(() async {
+        if (quantityMilli != null) {
+          final balance =
+              await (_db.select(_db.inventoryBalances)..where(
+                    (b) =>
+                        b.productId.equals(current.id) &
+                        b.warehouseId.equals(warehouseId!),
+                  ))
+                  .getSingleOrNull();
+          final available = balance?.quantityMilli ?? 0;
+          if (available != expectedQuantityMilli) {
+            throw const ValidationFailure(
+              'O stock mudou durante a edição. Reabra o produto e tente novamente.',
+            );
+          }
+          final delta = quantityMilli - available;
+          if (delta != 0) {
+            final moved = await InventoryLedger(_db).move(
+              companyId: current.companyId,
+              productId: current.id,
+              warehouseId: warehouseId!,
+              quantityMilli: delta,
+              type: delta > 0
+                  ? InventoryMovementType.adjustmentIn
+                  : InventoryMovementType.adjustmentOut,
+              deviceId: current.deviceId,
+              userId: userId!,
+              reason: 'Quantidade em kg definida na edição do produto',
+              allowNegative: false,
+            );
+            if (moved case Failure(:final error)) throw error;
+          }
+        }
         final now = DateTime.now().toUtc(), version = current.version + 1;
         String? clean(String? value) =>
             value?.trim().isEmpty ?? true ? null : value!.trim();
@@ -574,6 +619,8 @@ class ProductCatalog {
             );
       });
       return const Success(null);
+    } on AppFailure catch (error) {
+      return Failure(error);
     } catch (error) {
       return Failure(
         StorageFailure(

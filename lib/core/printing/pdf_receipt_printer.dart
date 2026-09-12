@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:systock/core/utils/quantity.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:systock/core/utils/money.dart';
@@ -32,7 +33,7 @@ Future<Uint8List> buildReceiptPdf(
             children: [
               pw.Expanded(child: pw.Text(l.description)),
               pw.Text(
-                '${l.quantityMilli / 1000} × ${_money(l.unitPriceMinor)}',
+                '${formatQuantity(l.quantityMilli)} × ${_money(l.unitPriceMinor)}',
               ),
               pw.SizedBox(width: 12),
               pw.Text(_money(l.totalMinor)),

@@ -132,10 +132,10 @@ class _StartupPageState extends ConsumerState<StartupPage> {
               ),
               const SizedBox(height: 16),
               for (final plan in const [
-                ('Trimestral', '349,00 MT', '3 meses'),
-                ('Semestral', '649,00 MT', '6 meses'),
-                ('Anual', '1.199,00 MT', '12 meses'),
-                ('Vitalício', '3.499,00 MT', 'para sempre'),
+                ('Trimestral', '449,00 MT', '3 meses'),
+                ('Semestral', '849,00 MT', '6 meses'),
+                ('Anual', '1.499,00 MT', '12 meses'),
+                ('Vitalício', '4.999,00 MT', 'para sempre'),
               ])
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 5),

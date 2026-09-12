@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/action_colors.dart';
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' show Value, Variable;
 import 'package:file_picker/file_picker.dart';
@@ -126,6 +127,7 @@ class ProductDetailPage extends ConsumerWidget {
               ),
               IconButton(
                 onPressed: () => _archive(context, db, d.product),
+                color: removalActionColor,
                 icon: const Icon(Icons.delete_outline),
                 tooltip: 'Remover produto'.localized(context),
               ),
@@ -334,6 +336,10 @@ class ProductDetailPage extends ConsumerWidget {
             child: const LocalizedText('Cancelar'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: removalActionColor,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(dialog, true),
             child: const LocalizedText('Remover'),
           ),

@@ -1,0 +1,132 @@
+POLÍTICA DE PRIVACIDADE DO SYSTOCK
+
+Última atualização: 12 de setembro de 2026
+
+IMPORTANTE
+
+Substitua os campos entre [colchetes] pelos dados verdadeiros da entidade que comercializa o Systock antes de publicar este documento. Esta política é um modelo operacional e deve ser revista por um profissional habilitado para confirmar a sua conformidade com a legislação aplicável no país onde o Systock é comercializado.
+
+1. RESPONSÁVEL PELO TRATAMENTO
+
+O Systock é disponibilizado por:
+
+Nome legal: [NOME LEGAL DA EMPRESA]
+Nome comercial: Systock
+NUIT/NIF ou registro: [NÚMERO DE REGISTRO]
+Endereço: [ENDEREÇO COMPLETO]
+Email de privacidade: [EMAIL DE PRIVACIDADE]
+Email de suporte: [EMAIL DE SUPORTE]
+
+Nesta política, “Systock”, “nós” e “nosso” referem-se à entidade acima. “Cliente”, “loja” ou “utilizador” refere-se à pessoa ou organização que utiliza o Systock.
+
+2. ÂMBITO
+
+Esta política explica como o aplicativo Systock trata dados quando é instalado num computador ou dispositivo móvel, quando é utilizado para gerir uma loja e quando o utilizador ativa a sincronização com uma conta Google Drive.
+
+O Systock pode funcionar localmente sem uma conta Google. A ligação ao Google Drive é opcional.
+
+3. DADOS TRATADOS
+
+Dependendo das funcionalidades utilizadas, o Systock pode armazenar:
+
+- Dados da loja: nome comercial, NUIT/NIF, endereço, telefone, email, moeda, armazéns e configurações.
+- Dados de utilizadores do sistema: nome, nome de utilizador, email quando fornecido, função, permissões e credenciais de autenticação. O PIN é armazenado como um resumo criptográfico; o PIN original não é armazenado.
+- Dados comerciais: produtos, códigos de barras, categorias, marcas, unidades, preços, custos, quantidades, lotes, validade, fornecedores, clientes, compras, vendas, pagamentos, despesas, caixa, transferências, relatórios e imagens associadas aos produtos.
+- Dados técnicos: identificador da loja, identificador do dispositivo, identificador da instalação, identificadores de operações de sincronização, versões, datas, estado da sincronização e registos necessários para segurança e recuperação.
+- Dados da conta Google, quando a sincronização é ativada: endereço de email e identificador estável da conta Google. O Systock não recebe nem armazena a palavra-passe da conta Google.
+
+O Cliente é responsável por garantir que possui base legal e autorização para inserir no Systock dados de clientes, fornecedores, funcionários e outras pessoas.
+
+4. COMO UTILIZAMOS OS DADOS
+
+Utilizamos os dados para:
+
+- disponibilizar o cadastro de produtos, vendas, compras, stock, caixa e relatórios;
+- autenticar utilizadores e aplicar funções e permissões;
+- guardar os dados localmente para permitir o funcionamento offline;
+- sincronizar dados da loja entre a caixa principal e uma instalação de recuperação autorizada;
+- criar backups e permitir a recuperação da loja;
+- detetar inconsistências, duplicações, corrupção de backups e tentativas de sincronização com uma conta incorreta;
+- responder a pedidos de suporte, cumprir obrigações legais e proteger o aplicativo contra utilização indevida.
+
+Não utilizamos os dados do Cliente para publicidade comportamental, venda de bases de dados, definição de crédito, criação de perfis comerciais de consumidores ou comercialização com terceiros.
+
+5. GOOGLE DRIVE E DADOS DA GOOGLE
+
+Quando o Cliente escolhe “Sincronizar com Google Drive”, o Systock abre a autorização oficial da Google no navegador do sistema. O Systock solicita somente:
+
+https://www.googleapis.com/auth/drive.appdata
+
+Esta permissão permite guardar e ler dados da aplicação na pasta privada do Systock no Google Drive. Esses ficheiros não são apresentados na pasta normal do Drive para edição pelo utilizador e não são partilhados pelo Systock com outras contas.
+
+O Systock utiliza o email e o identificador estável devolvidos pela Google para associar a conta autorizada à loja. Esses dados não são vendidos, utilizados para publicidade ou combinados com dados de outras finalidades.
+
+Os backups da loja são cifrados antes do envio para o Google Drive. A chave de recuperação é gerada no dispositivo, é guardada no armazenamento seguro do dispositivo e não é enviada para o Google Drive. O utilizador deve guardar uma cópia da chave num local seguro.
+
+O tratamento realizado pela Google está sujeito às políticas e aos termos da Google. O Systock utiliza os dados recebidos da Google apenas para autenticação, associação da loja, sincronização e recuperação solicitadas pelo Cliente, em conformidade com a Google API Services User Data Policy.
+
+Ao desligar o Google Drive no Systock, novas sincronizações são interrompidas e as credenciais locais são removidas. O Cliente também pode remover a autorização nas definições de segurança da sua Conta Google. Os backups existentes no espaço privado da aplicação podem precisar de ser removidos através do fluxo de remoção de dados do aplicativo ou mediante pedido ao suporte.
+
+6. ONDE OS DADOS FICAM
+
+Sem sincronização, os dados ficam no dispositivo em que o Systock está instalado. Com sincronização, cópias cifradas ficam na conta Google Drive escolhida pelo Cliente. O Systock não mantém atualmente um servidor próprio com uma cópia central das bases de dados das lojas.
+
+O Systock pode utilizar serviços do sistema operativo para armazenamento seguro de credenciais, abertura do navegador, impressão, notificações e seleção de ficheiros. Esses serviços tratam os dados segundo as suas próprias políticas quando aplicável.
+
+7. SEGURANÇA
+
+Aplicamos medidas razoáveis para proteger os dados, incluindo:
+
+- armazenamento local protegido pelo sistema operativo e pelo acesso ao dispositivo;
+- autenticação local, PIN e permissões de utilizador;
+- comunicação cifrada com os serviços Google;
+- cifragem autenticada AES-GCM dos backups antes do upload;
+- armazenamento das credenciais de autorização no armazenamento seguro do dispositivo;
+- verificação de checksum, integridade SQLite e identidade da loja antes da recuperação;
+- bloqueio quando a conta Google, a loja ou a caixa autorizada não correspondem.
+
+Nenhum método de armazenamento ou transmissão é absolutamente seguro. O Cliente deve manter o sistema operativo atualizado, proteger o dispositivo, limitar as permissões dos utilizadores e guardar a chave de recuperação fora do computador.
+
+8. RETENÇÃO
+
+Os dados locais permanecem no dispositivo até serem apagados pelo Cliente, substituídos por uma recuperação autorizada ou removidos conforme a operação do sistema e a legislação aplicável.
+
+O Systock mantém versões recentes de backups cifrados no Google Drive para recuperação. A retenção pode ser limitada pelo aplicativo, pela conta Google ou por instruções do Cliente. Registos necessários para auditoria, segurança, obrigações legais ou resolução de litígios podem ser mantidos pelo período necessário.
+
+9. DIREITOS DO TITULAR DOS DADOS
+
+Conforme a legislação aplicável, o titular pode solicitar acesso, correção, eliminação, limitação, oposição ou portabilidade dos seus dados. O pedido deve ser enviado para [EMAIL DE PRIVACIDADE] com informação suficiente para verificarmos a identidade e a relação com a loja.
+
+Os dados inseridos pelo Cliente na operação da loja são controlados pelo Cliente. Quando o Systock trata esses dados apenas para prestar o serviço, o Cliente deve encaminhar pedidos dos seus próprios clientes e funcionários conforme as suas responsabilidades legais.
+
+10. TRANSFERÊNCIA E SUBCONTRATANTES
+
+O Systock não vende dados pessoais nem os transfere para corretores de dados ou plataformas de publicidade. Quando a sincronização é ativada, os dados são enviados para o Google Drive da conta escolhida pelo Cliente. A Google atua de acordo com os seus próprios termos, políticas e medidas de segurança.
+
+Não autorizamos o uso dos dados recebidos da Google para finalidades diferentes das descritas nesta política.
+
+11. PRIVACIDADE DE MENORES
+
+O Systock é uma ferramenta comercial e não é dirigido a crianças. Não recolhemos conscientemente dados de menores como utilizadores do aplicativo.
+
+12. ALTERAÇÕES A ESTA POLÍTICA
+
+Podemos atualizar esta política para refletir alterações no aplicativo, nos serviços utilizados, na legislação ou nas práticas de segurança. A data no início da política será atualizada. Quando uma alteração modificar materialmente a utilização de dados da Google ou de dados pessoais, apresentaremos aviso no aplicativo ou solicitaremos novo consentimento quando exigido.
+
+13. CONTACTO E RECLAMAÇÕES
+
+Para dúvidas, pedidos ou reclamações sobre privacidade, contacte:
+
+[NOME LEGAL DA EMPRESA]
+[EMAIL DE PRIVACIDADE]
+[ENDEREÇO OU WEBSITE]
+
+O titular também pode apresentar reclamação à autoridade de proteção de dados competente no seu país.
+
+14. REFERÊNCIAS
+
+Google API Services User Data Policy:
+https://developers.google.com/terms/api-services-user-data-policy
+
+Google Drive appDataFolder:
+https://developers.google.com/workspace/drive/api/guides/appdata

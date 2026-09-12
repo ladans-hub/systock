@@ -1,6 +1,9 @@
+import 'package:systock/core/utils/quantity.dart';
+import 'package:systock/core/utils/money.dart';
+import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:drift/drift.dart' show Value;
+import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -81,6 +84,14 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   List<Brand> brands = const [];
   List<Unit> units = const [];
   List<Lot> lots = const [];
+  List<Warehouse> warehouses = const [];
+  final balances = <String, int>{};
+  String? warehouseId;
+  final quantity = TextEditingController();
+  final price = TextEditingController();
+  bool get isKg =>
+      units.where((u) => u.id == unitId).firstOrNull?.code.toUpperCase() ==
+      'KG';
   final name = TextEditingController();
   final description = TextEditingController();
   final barcode = TextEditingController();
@@ -114,6 +125,24 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
               ..where((l) => l.productId.equals(widget.id))
               ..where((l) => l.deletedAt.isNull()))
             .get();
+    warehouses =
+        await (db.select(db.warehouses)..where(
+              (w) =>
+                  w.companyId.equals(loaded.companyId) &
+                  w.active.equals(true) &
+                  w.deletedAt.isNull(),
+            ))
+            .get();
+    final stock = await (db.select(
+      db.inventoryBalances,
+    )..where((b) => b.productId.equals(widget.id))).get();
+    balances.addEntries(
+      stock.map((b) => MapEntry(b.warehouseId, b.quantityMilli)),
+    );
+    warehouseId = warehouses.firstOrNull?.id;
+    quantity.text = formatQuantity(balances[warehouseId] ?? 0);
+    price.text =
+        '${loaded.saleMinor ~/ 100},${(loaded.saleMinor % 100).toString().padLeft(2, '0')}';
     product = loaded;
     name.text = loaded.name;
     description.text = loaded.description ?? '';
@@ -135,9 +164,30 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
 
   Future<void> _save() async {
     final current = product;
-    if (current == null) return;
+    if (current == null || saving) return;
+    int saleMinor = current.saleMinor;
+    int? targetQuantity;
+    try {
+      if (isKg) {
+        if (!RegExp(r'^\d+([,.]\d{1,2})?$').hasMatch(price.text.trim())) {
+          throw const FormatException('Informe um preço por kg válido.');
+        }
+        saleMinor = parseMoneyMinor(price.text);
+        if (current.trackStock) {
+          final parsed = parseQuantityMilli(quantity.text);
+          if (warehouseId == null) {
+            throw const FormatException('Cadastre um armazém ativo.');
+          }
+          if (parsed != (balances[warehouseId] ?? 0)) targetQuantity = parsed;
+        }
+      }
+    } on FormatException catch (error) {
+      await showAppError(context, error.message);
+      return;
+    }
     setState(() => saving = true);
     final db = ref.read(databaseProvider);
+    final user = targetQuantity == null ? null : await currentSessionUser(db);
     final result = await ProductCatalog(db).updateComplete(
       current: current,
       name: name.text,
@@ -147,7 +197,13 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       brandId: brandId,
       unitId: unitId,
       costMinor: current.costMinor,
-      saleMinor: current.saleMinor,
+      saleMinor: saleMinor,
+      quantityMilli: targetQuantity,
+      expectedQuantityMilli: targetQuantity == null
+          ? null
+          : balances[warehouseId] ?? 0,
+      warehouseId: warehouseId,
+      userId: user?.id,
       wholesaleMinor: current.wholesaleMinor,
       minimumPriceMinor: current.minimumPriceMinor,
       minimumStockMilli: current.minimumStockMilli,
@@ -178,6 +234,22 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     }
     if (mounted) setState(() => saving = false);
     if (mounted) await showAppFailure(context, (result as Failure<void>).error);
+  }
+
+  @override
+  void dispose() {
+    for (final controller in [
+      name,
+      description,
+      barcode,
+      location,
+      shelf,
+      quantity,
+      price,
+    ]) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 
   @override
@@ -279,7 +351,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
               leading: const Icon(Icons.shield_outlined),
               title: const LocalizedText('Edição segura'),
               subtitle: const LocalizedText(
-                'Preços, custos, códigos e regras de stock não são alterados neste formulário.',
+                'Ao selecionar KG, pode definir o preço por kg e ajustar a quantidade existente com registo no histórico.',
               ),
             ),
           ),
@@ -309,6 +381,48 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
               ),
             ],
           ),
+          if (isKg) ...[
+            const SizedBox(height: 14),
+            _Section(
+              title: 'Venda por peso',
+              children: [
+                if (product!.trackStock) ...[
+                  _dropdown(
+                    'Armazém',
+                    warehouseId,
+                    warehouses.map((w) => (w.id, w.name)).toList(),
+                    (value) => setState(() {
+                      warehouseId = value;
+                      quantity.text = formatQuantity(balances[value] ?? 0);
+                    }),
+                  ),
+                  TextField(
+                    controller: quantity,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Quantidade existente (kg)',
+                      suffixText: 'kg',
+                      helperText:
+                          'Total disponível neste armazém. Aceita até 3 casas decimais.',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                TextField(
+                  controller: price,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Preço por kg',
+                    suffixText: 'MT/kg',
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 14),
           _Section(
             title: 'Localização',

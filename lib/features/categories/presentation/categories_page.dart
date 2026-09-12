@@ -1,3 +1,5 @@
+import 'package:systock/core/widgets/platform_controls.dart';
+import 'package:systock/core/widgets/action_colors.dart';
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Value;
 import 'package:flutter/material.dart';
@@ -242,6 +244,10 @@ class CategoriesPage extends ConsumerWidget {
               child: const LocalizedText('Cancelar'),
             ),
             FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: removalActionColor,
+                foregroundColor: Colors.white,
+              ),
               onPressed: () => Navigator.pop(dialog, true),
               child: const LocalizedText('Remover'),
             ),
@@ -295,19 +301,9 @@ class _CatalogListState extends State<_CatalogList> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: TextField(
+            child: AdaptiveSearchField(
+              hintText: 'Pesquisar categorias ou marcas'.localized(context),
               onChanged: (value) => setState(() => query = value),
-              decoration: InputDecoration(
-                hintText: 'Pesquisar categorias ou marcas',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: query.isEmpty
-                    ? null
-                    : IconButton(
-                        onPressed: () => setState(() => query = ''),
-                        icon: const Icon(Icons.clear),
-                      ),
-                border: const OutlineInputBorder(),
-              ),
             ),
           ),
           Expanded(
@@ -334,7 +330,10 @@ class _CatalogListState extends State<_CatalogList> {
                             ),
                             PopupMenuItem(
                               value: 'delete',
-                              child: LocalizedText('Remover'),
+                              child: LocalizedText(
+                                'Remover',
+                                style: TextStyle(color: removalActionColor),
+                              ),
                             ),
                           ],
                         ),

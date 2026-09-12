@@ -20,7 +20,17 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed .
       - run: flutter analyze
       - run: flutter test
-      - run: flutter build apk --release
+      - name: Create Android build defines
+        env:
+          GOOGLE_ANDROID_CLIENT_ID: ${{ vars.GOOGLE_ANDROID_CLIENT_ID }}
+          GOOGLE_SERVER_CLIENT_ID: ${{ vars.GOOGLE_SERVER_CLIENT_ID }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          with open('defines.json', 'w') as f:
+              json.dump({k: os.environ.get(k, '') for k in ('GOOGLE_ANDROID_CLIENT_ID', 'GOOGLE_SERVER_CLIENT_ID')}, f)
+          PY
+      - run: flutter build apk --release --dart-define-from-file=defines.json
       - uses: actions/upload-artifact@v4
         with:
           name: Systock-Android-release
@@ -36,8 +46,21 @@ jobs:
           flutter-version: 3.44.8
           cache: true
       - run: flutter pub get
-      - run: flutter build ios --debug --no-codesign
-      - run: flutter build macos --debug
+      - name: Create Apple build defines
+        env:
+          GOOGLE_IOS_CLIENT_ID: ${{ vars.GOOGLE_IOS_CLIENT_ID }}
+          GOOGLE_APPLE_CLIENT_ID: ${{ vars.GOOGLE_APPLE_CLIENT_ID }}
+          GOOGLE_DESKTOP_CLIENT_ID: ${{ vars.GOOGLE_DESKTOP_CLIENT_ID }}
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          keys = ('GOOGLE_IOS_CLIENT_ID', 'GOOGLE_APPLE_CLIENT_ID', 'GOOGLE_DESKTOP_CLIENT_ID', 'GOOGLE_DESKTOP_CLIENT_SECRET')
+          with open('defines.json', 'w') as f:
+              json.dump({k: os.environ.get(k, '') for k in keys}, f)
+          PY
+      - run: flutter build ios --debug --no-codesign --dart-define-from-file=defines.json
+      - run: flutter build macos --debug --dart-define-from-file=defines.json
 
   windows:
     runs-on: windows-latest
@@ -49,7 +72,17 @@ jobs:
           flutter-version: 3.44.8
           cache: true
       - run: flutter pub get
-      - run: flutter build windows --release
+      - name: Create Windows build defines
+        shell: pwsh
+        env:
+          GOOGLE_DESKTOP_CLIENT_ID: ${{ vars.GOOGLE_DESKTOP_CLIENT_ID }}
+          GOOGLE_DESKTOP_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_CLIENT_SECRET }}
+        run: |
+          @{
+            GOOGLE_DESKTOP_CLIENT_ID = $env:GOOGLE_DESKTOP_CLIENT_ID
+            GOOGLE_DESKTOP_CLIENT_SECRET = $env:GOOGLE_DESKTOP_CLIENT_SECRET
+          } | ConvertTo-Json | Set-Content -Path defines.json -Encoding UTF8
+      - run: flutter build windows --release --dart-define-from-file=defines.json
       - name: Package Windows release
         shell: pwsh
         run: |

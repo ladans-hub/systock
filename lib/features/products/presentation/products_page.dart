@@ -1,3 +1,5 @@
+import 'package:systock/core/widgets/action_colors.dart';
+import 'package:systock/core/utils/quantity.dart';
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -541,6 +543,9 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         quantity = TextEditingController(text: '0');
     DateTime? expiresAt;
     String? categoryId, brandId, unitId = units.firstOrNull?.id, imagePath;
+    bool isKg() =>
+        units.where((u) => u.id == unitId).firstOrNull?.code.toUpperCase() ==
+        'KG';
     bool saving = false;
     Future<void> save(BuildContext dialog, StateSetter setDialogState) async {
       if (saving) return;
@@ -572,13 +577,16 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
           return;
         }
         if (!dialog.mounted) return;
-        final parsedQuantity = double.tryParse(
-          quantity.text.replaceAll(',', '.'),
-        );
-        if (parsedQuantity == null ||
-            !parsedQuantity.isFinite ||
-            parsedQuantity < 0) {
-          await showAppError(dialog, 'Informe uma quantidade válida.');
+        int parsedQuantity;
+        try {
+          parsedQuantity = parseQuantityMilli(
+            quantity.text,
+            decimalPlaces: quantityPrecision(
+              units.where((u) => u.id == unitId).firstOrNull,
+            ),
+          );
+        } on FormatException catch (e) {
+          await showAppError(dialog, e.message);
           return;
         }
         final warehouse =
@@ -606,7 +614,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
           categoryId: categoryId,
           brandId: brandId,
           unitId: unitId,
-          initialQuantityMilli: (parsedQuantity * 1000).round(),
+          initialQuantityMilli: parsedQuantity,
           warehouseId: warehouse.id,
           userId: user.id,
         );
@@ -828,6 +836,40 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                   ),
                   const SizedBox(height: 12),
                   TextField(
+                    controller: quantity,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText:
+                          (isKg()
+                                  ? 'Quantidade existente (kg) *'
+                                  : 'Quantidade inicial *')
+                              .localized(context),
+                      suffixText: units
+                          .where((u) => u.id == unitId)
+                          .firstOrNull
+                          ?.code,
+                      helperText:
+                          'Esta quantidade será a primeira entrada de stock'
+                              .localized(context),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: price,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: (isKg() ? 'Preço por kg' : 'Preço de venda')
+                          .localized(context),
+                      helperText:
+                          'Preço por ${units.where((u) => u.id == unitId).firstOrNull?.code ?? 'UN'}',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
                     controller: barcode,
                     decoration: InputDecoration(
                       labelText: 'Código de barras'.localized(context),
@@ -888,26 +930,6 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  TextField(
-                    controller: quantity,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: InputDecoration(
-                      labelText: 'Quantidade inicial *'.localized(context),
-                      helperText:
-                          'Esta quantidade será a primeira entrada de stock'
-                              .localized(context),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: price,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Preço de venda'.localized(context),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -974,6 +996,10 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
             child: const LocalizedText('Cancelar'),
           ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: removalActionColor,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.pop(dialog, true),
             child: const LocalizedText('Remover'),
           ),
@@ -1031,7 +1057,13 @@ class _ProductListCard extends StatelessWidget {
             onSelected: (value) => value == 'remove' ? onRemove() : onEdit(),
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'edit', child: LocalizedText('Editar')),
-              PopupMenuItem(value: 'remove', child: LocalizedText('Remover')),
+              PopupMenuItem(
+                value: 'remove',
+                child: LocalizedText(
+                  'Remover',
+                  style: TextStyle(color: removalActionColor),
+                ),
+              ),
             ],
           ),
         ],
@@ -1112,7 +1144,10 @@ class _ProductGridCard extends StatelessWidget {
                     ),
                     PopupMenuItem(
                       value: 'remove',
-                      child: LocalizedText('Remover'),
+                      child: LocalizedText(
+                        'Remover',
+                        style: TextStyle(color: removalActionColor),
+                      ),
                     ),
                   ],
                 ),

@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/action_colors.dart';
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:async';
 import 'package:drift/drift.dart' show Variable;
@@ -112,15 +113,6 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                   controller: _searchController,
                   hintText: 'Nome ou código de barras'.localized(context),
                   onChanged: _search,
-                  trailing: IconButton(
-                    tooltip: 'Limpar pesquisa'.localized(context),
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      _debounce?.cancel();
-                      _searchController.clear();
-                      setState(() => _query = '');
-                    },
-                  ),
                 ),
               ),
               Expanded(
@@ -272,7 +264,10 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                     ),
                     ButtonSegment(
                       value: 'Remover',
-                      label: LocalizedText('Remover'),
+                      label: LocalizedText(
+                        'Remover',
+                        style: TextStyle(color: removalActionColor),
+                      ),
                     ),
                   ],
                   selected: {type},

@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/action_colors.dart';
 import 'package:drift/drift.dart';
 import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter/material.dart' hide Notification;
@@ -82,7 +83,10 @@ class AlertsPage extends ConsumerWidget {
                     ),
                     PopupMenuItem(
                       value: _NotificationAction.delete,
-                      child: LocalizedText('Apagar'),
+                      child: LocalizedText(
+                        'Apagar',
+                        style: TextStyle(color: removalActionColor),
+                      ),
                     ),
                   ],
                 ),

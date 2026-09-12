@@ -12,11 +12,34 @@ Backup é separado: snapshot SQLite consistente via `VACUUM INTO`, manifesto com
 
 1. No Google Cloud Console, ative a Google Drive API e configure a tela de consentimento.
 2. Crie clientes OAuth para `mz.ladans.systock` em cada plataforma. No Android, registe também os SHA-1 dos certificados debug e release.
-3. Em iOS/macOS, adicione `GIDClientID` e o URL scheme `REVERSED_CLIENT_ID` ao `Info.plist` de cada Runner. O URL scheme é obrigatório mesmo quando o client id é fornecido via Dart.
+3. Em iOS/macOS, adicione `GIDClientID` e o URL scheme `REVERSED_CLIENT_ID` ao `Info.plist` de cada Runner. O URL scheme é obrigatório mesmo quando o client id é fornecido via Dart. No Android, forneça `GOOGLE_ANDROID_CLIENT_ID` ou configure `google-services.json` com um cliente web.
 4. O client id também pode ser injetado sem entrar no repositório:
 
-   `flutter run -d macos --dart-define=GOOGLE_APPLE_CLIENT_ID=CLIENT_ID.apps.googleusercontent.com`
+   `flutter run -d ios --dart-define=GOOGLE_IOS_CLIENT_ID=CLIENT_ID.apps.googleusercontent.com`
 
    Um client id de servidor opcional usa `--dart-define=GOOGLE_SERVER_CLIENT_ID=...`.
 
-O app solicita somente `drive.appdata`, portanto os pacotes ficam na pasta privada do aplicativo e não aparecem entre os ficheiros normais do utilizador. O macOS já inclui acesso de rede. Ao configurar a assinatura Apple, habilite Keychain Sharing com o grupo `$(AppIdentifierPrefix)com.google.GIDSignIn`; essa capability exige uma equipa/certificado de desenvolvimento e não pode ser ativada num Runner local sem assinatura.
+O app solicita somente `drive.appdata`, portanto os pacotes ficam na pasta privada do aplicativo e não aparecem entre os ficheiros normais do utilizador. O macOS já inclui acesso de rede. No Runner local, o armazenamento usa o Keychain clássico para funcionar sem uma conta de assinatura Xcode. Para distribuir uma versão assinada, habilite Keychain Sharing no target Runner e use um grupo associado à equipa Apple da aplicação.
+
+## Operação comercial de uma caixa por loja
+
+Cada loja fica associada a uma conta Google e a uma época de caixa (`claim`). O primeiro computador que liga a loja recebe uma chave de recuperação de 256 bits; a chave não é guardada no banco nem enviada para o Drive. O proprietário deve guardá-la fora do computador. Uma instalação nova, sem dados, pode escolher a loja encontrada no Drive e restaurar a versão mais recente depois de introduzir a chave.
+
+As cópias da loja são cifradas com AES-GCM antes do upload e incluem o SQLite, imagens e um fingerprint lógico. Cada cópia tem nome imutável; não existe um ficheiro `latest` que possa ser sobrescrito por uma caixa antiga. A transferência para outro computador cria uma nova época ligada à anterior. Em caso de duas transferências concorrentes, a sincronização é bloqueada para evitar escolher um vencedor automaticamente.
+
+Em computadores desktop, o OAuth usa o navegador do sistema, redirect loopback local e PKCE. O client id instalado deve ser fornecido no build sem entrar no repositório:
+
+`flutter run -d macos --dart-define=GOOGLE_DESKTOP_CLIENT_ID=CLIENT_ID.apps.googleusercontent.com`
+
+Alguns clientes OAuth desktop criados no Google Cloud exigem também o segredo apresentado no JSON das credenciais. Nesse caso, o ficheiro local de defines deve conter ambos os valores (não publique esse ficheiro):
+
+```json
+{
+  "GOOGLE_DESKTOP_CLIENT_ID": "CLIENT_ID.apps.googleusercontent.com",
+  "GOOGLE_DESKTOP_CLIENT_SECRET": "CLIENT_SECRET"
+}
+```
+
+Execute com `flutter run -d macos --dart-define-from-file=defines.json`.
+
+O processo automático tenta sincronizar a cada dois minutos e ao retomar a aplicação. Uma falha de rede deixa as vendas locais intactas e tenta novamente mais tarde. Antes da distribuição comercial, publique o consentimento OAuth e conclua a verificação aplicável; o fluxo instalado não deve conter segredos de servidor.

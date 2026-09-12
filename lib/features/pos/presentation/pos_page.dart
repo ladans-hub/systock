@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/action_colors.dart';
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -15,6 +16,7 @@ import 'package:systock/core/scanner/barcode_keyboard_decoder.dart';
 import 'package:systock/features/products/application/product_catalog.dart';
 import 'package:systock/features/sales/application/complete_sale.dart';
 import 'package:systock/core/utils/money.dart';
+import 'package:systock/core/utils/quantity.dart';
 import 'package:systock/core/widgets/platform_controls.dart';
 import 'package:systock/features/products/presentation/product_image.dart';
 import 'package:systock/core/database/document_number_service.dart';
@@ -32,8 +34,10 @@ class _PosPageState extends ConsumerState<PosPage> {
   final hid = BarcodeKeyboardDecoder();
   final cart = <String, ({Product product, int quantityMilli})>{};
   final favorites = <String>{};
+  final units = <String, Unit>{};
+  bool editingQuantity = false;
   String search = '';
-  bool gridView = true;
+  bool gridView = false;
   bool completing = false;
   Timer? searchDebounce;
   int get total => cart.values.fold(
@@ -44,11 +48,133 @@ class _PosPageState extends ConsumerState<PosPage> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(_restoreActive);
+    Future.microtask(() async {
+      final loaded = await ref
+          .read(databaseProvider)
+          .select(ref.read(databaseProvider).units)
+          .get();
+      if (!mounted) return;
+      setState(() => units.addEntries(loaded.map((u) => MapEntry(u.id, u))));
+      await _restoreActive();
+    });
     Future.microtask(_restoreFavorites);
   }
 
+  String unitCode(Product p) => units[p.unitId]?.code ?? 'UN';
+  bool isKg(Product p) => unitCode(p).toUpperCase() == 'KG';
+
   Future<void> add(Product p) async {
+    if (editingQuantity || completing) return;
+    final db = ref.read(databaseProvider);
+    if (p.unitId != null && !units.containsKey(p.unitId)) {
+      final unit = await (db.select(
+        db.units,
+      )..where((u) => u.id.equals(p.unitId!))).getSingleOrNull();
+      if (!mounted) return;
+      if (unit != null) units[unit.id] = unit;
+    }
+    if (isKg(p)) {
+      await editQuantity(p, adding: true);
+    } else {
+      await setQuantity(p, (cart[p.id]?.quantityMilli ?? 0) + 1000);
+    }
+  }
+
+  Future<void> editQuantity(Product p, {bool adding = false}) async {
+    if (!isKg(p) || editingQuantity || completing) return;
+    editingQuantity = true;
+    final precision = quantityPrecision(units[p.unitId]);
+    final controller = TextEditingController(
+      text: adding ? '' : formatQuantity(cart[p.id]?.quantityMilli ?? 1000),
+    );
+    String? error;
+    final route = DialogRoute<int>(
+      context: context,
+      builder: (dialog) => StatefulBuilder(
+        builder: (dialog, update) {
+          int? parsed;
+          try {
+            parsed = parseQuantityMilli(
+              controller.text,
+              decimalPlaces: precision,
+            );
+          } on FormatException {
+            /* Validation is displayed on confirmation. */
+          }
+          void confirm() {
+            try {
+              final value = parseQuantityMilli(
+                controller.text,
+                decimalPlaces: precision,
+              );
+              if (value <= 0) {
+                throw const FormatException(
+                  'Informe uma quantidade maior que zero.',
+                );
+              }
+              Navigator.pop(dialog, value);
+            } on FormatException catch (e) {
+              update(() => error = e.message);
+            }
+          }
+
+          return AlertDialog(
+            title: Text(
+              '${adding ? 'Adicionar' : 'Editar quantidade'} · ${p.name}',
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('${formatMoneyMinor(p.saleMinor)} / ${unitCode(p)}'),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  keyboardType: TextInputType.numberWithOptions(
+                    decimal: precision > 0,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Quantidade (${unitCode(p)})',
+                    errorText: error,
+                  ),
+                  onChanged: (_) => update(() => error = null),
+                  onSubmitted: (_) => confirm(),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Subtotal: ${formatMoneyMinor((parsed ?? 0) * p.saleMinor ~/ 1000)}',
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialog),
+                child: const LocalizedText('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: confirm,
+                child: const LocalizedText('Confirmar'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    try {
+      final amount = await Navigator.of(context).push(route);
+      if (amount != null && mounted) {
+        await setQuantity(
+          p,
+          amount + (adding ? cart[p.id]?.quantityMilli ?? 0 : 0),
+        );
+      }
+    } finally {
+      editingQuantity = false;
+      await route.completed;
+      controller.dispose();
+    }
+  }
+
+  Future<void> setQuantity(Product p, int desired) async {
     if (p.trackStock && !p.allowNegativeStock) {
       final db = ref.read(databaseProvider);
       final warehouse =
@@ -72,21 +198,15 @@ class _PosPageState extends ConsumerState<PosPage> {
               ))
               .getSingleOrNull();
       if (!mounted) return;
-      final desired = (cart[p.id]?.quantityMilli ?? 0) + 1000;
       final available = balance?.quantityMilli ?? 0;
       if (desired > available) {
         _showCartError(
-          'Stock insuficiente para ${p.name}. Disponível: ${available / 1000}.',
+          'Stock insuficiente para ${p.name}. Disponível: ${formatQuantity(available)} ${unitCode(p)}.',
         );
         return;
       }
     }
-    setState(
-      () => cart[p.id] = (
-        product: p,
-        quantityMilli: (cart[p.id]?.quantityMilli ?? 0) + 1000,
-      ),
-    );
+    setState(() => cart[p.id] = (product: p, quantityMilli: desired));
     unawaited(_saveCart('pos.active_cart'));
   }
 
@@ -507,9 +627,12 @@ class _PosPageState extends ConsumerState<PosPage> {
                           children: cart.values
                               .map(
                                 (e) => ListTile(
+                                  onTap: isKg(e.product)
+                                      ? () => editQuantity(e.product)
+                                      : null,
                                   title: Text(e.product.name),
                                   subtitle: LocalizedText(
-                                    '${e.quantityMilli / 1000} × ${formatMoneyMinor(e.product.saleMinor)}',
+                                    '${formatQuantity(e.quantityMilli)} ${unitCode(e.product)} × ${formatMoneyMinor(e.product.saleMinor)} / ${unitCode(e.product)} = ${formatMoneyMinor(e.quantityMilli * e.product.saleMinor ~/ 1000)}',
                                   ),
                                   trailing: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -518,27 +641,37 @@ class _PosPageState extends ConsumerState<PosPage> {
                                         onPressed: () => add(e.product),
                                         glyph: PlatformGlyph.add,
                                       ),
-                                      AdaptiveIconButton(
-                                        onPressed: () => setState(() {
-                                          final q = e.quantityMilli - 1000;
-                                          if (q <= 0) {
-                                            cart.remove(e.product.id);
-                                          } else {
-                                            cart[e.product.id] = (
-                                              product: e.product,
-                                              quantityMilli: q,
+                                      if (isKg(e.product))
+                                        IconButton(
+                                          tooltip: 'Editar quantidade',
+                                          icon: const Icon(Icons.edit_outlined),
+                                          onPressed: () =>
+                                              editQuantity(e.product),
+                                        ),
+                                      if (!isKg(e.product))
+                                        AdaptiveIconButton(
+                                          onPressed: () => setState(() {
+                                            final q = e.quantityMilli - 1000;
+                                            if (q <= 0) {
+                                              cart.remove(e.product.id);
+                                            } else {
+                                              cart[e.product.id] = (
+                                                product: e.product,
+                                                quantityMilli: q,
+                                              );
+                                            }
+                                            unawaited(
+                                              _saveCart('pos.active_cart'),
                                             );
-                                          }
-                                          unawaited(
-                                            _saveCart('pos.active_cart'),
-                                          );
-                                        }),
-                                        glyph: PlatformGlyph.remove,
-                                      ),
+                                          }),
+                                          glyph: PlatformGlyph.remove,
+                                          destructive: e.quantityMilli <= 1000,
+                                        ),
                                       IconButton(
                                         tooltip: 'Remover item'.localized(
                                           context,
                                         ),
+                                        color: removalActionColor,
                                         icon: const Icon(Icons.delete_outline),
                                         onPressed: () {
                                           setState(
@@ -693,7 +826,7 @@ class _PosPageState extends ConsumerState<PosPage> {
             .map(
               (e) => SaleLineInput(
                 productId: e.product.id,
-                description: e.product.name,
+                description: '${e.product.name} (${unitCode(e.product)})',
                 quantityMilli: e.quantityMilli,
                 unitPriceMinor: e.product.saleMinor,
                 unitCostMinor: e.product.costMinor,
@@ -855,6 +988,7 @@ class _PosPageState extends ConsumerState<PosPage> {
                             onPressed: rows.length == 1
                                 ? null
                                 : () => setDialogState(() => rows.removeAt(i)),
+                            color: removalActionColor,
                             icon: const Icon(Icons.remove_circle_outline),
                           ),
                         ],
