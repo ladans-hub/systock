@@ -121,7 +121,7 @@ class GoogleDriveAuthService {
       return;
     }
     await initialize();
-    await _signIn.disconnect();
+    await _signIn.signOut();
   }
 }
 

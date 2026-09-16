@@ -20,11 +20,13 @@ class InitialSyncSnapshot {
     await db.transaction(() async {
       for (final product in products) {
         final exists =
-            await (db.select(db.syncOperations)..where(
-                  (o) =>
-                      o.entityType.equals('product') &
-                      o.entityId.equals(product.id),
-                ))
+            await (db.select(db.syncOperations)
+                  ..where(
+                    (o) =>
+                        o.entityType.equals('product') &
+                        o.entityId.equals(product.id),
+                  )
+                  ..limit(1))
                 .getSingleOrNull();
         if (exists != null) continue;
         final barcode =

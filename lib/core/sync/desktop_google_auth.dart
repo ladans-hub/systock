@@ -188,20 +188,7 @@ class DesktopGoogleAuth {
   }
 
   Future<void> disconnect() async {
-    final value = await secrets.read('oauth');
-    // Clear local authorization even if Google cannot be reached.
+    // Local sign-out must not revoke the grant used by the other devices.
     await secrets.write('oauth', '');
-    if (value == null || value.isEmpty) return;
-    try {
-      final saved = jsonDecode(value) as Map<String, dynamic>;
-      await http
-          .post(
-            Uri.https('oauth2.googleapis.com', '/revoke'),
-            body: {'token': saved['refreshToken'] as String},
-          )
-          .timeout(const Duration(seconds: 15));
-    } catch (_) {
-      /* Local disconnect already completed. */
-    }
   }
 }

@@ -1,6 +1,5 @@
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math' as math;
 import 'package:drift/drift.dart' show InsertMode;
 import 'package:flutter/material.dart';
@@ -8,20 +7,18 @@ import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/database/database_provider.dart';
-import 'package:systock/core/errors/result.dart';
 import 'package:systock/core/sync/google_drive_auth_service.dart';
 import 'package:systock/core/sync/google_drive_transport.dart';
-import 'package:systock/core/sync/sync_engine.dart';
-import 'package:systock/core/network/connectivity_service.dart';
-import 'package:systock/core/sync/initial_sync_snapshot.dart';
-import 'package:systock/core/widgets/platform_controls.dart';
 import 'package:systock/core/sync/drive_recovery_snapshot.dart';
-import 'package:flutter/services.dart';
+import 'package:systock/core/errors/result.dart';
+import 'package:systock/core/network/connectivity_service.dart';
+import 'package:systock/core/widgets/platform_controls.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:systock/core/sync/drive_vault_identity.dart';
 import 'package:systock/core/sync/drive_vault_service.dart';
 import 'package:systock/core/sync/drive_vault_store.dart';
 import 'package:systock/core/sync/vault_cipher.dart';
+import 'package:systock/core/sync/drive_connection_dialogs.dart';
 
 class SyncPage extends ConsumerStatefulWidget {
   const SyncPage({super.key});
@@ -38,8 +35,10 @@ class _SyncPageState extends ConsumerState<SyncPage>
 
   void _setBusy(bool value) {
     if (value) {
+      if (!mounted) return;
       _syncAnimationController.repeat();
     } else {
+      if (!mounted) return;
       _syncAnimationController.stop();
       _syncAnimationController.reset();
     }
@@ -65,9 +64,17 @@ class _SyncPageState extends ConsumerState<SyncPage>
 
   Future<void> _restoreSession() async {
     try {
+      final binding = await DriveVaultService.binding(
+        ref.read(databaseProvider),
+      );
+      if (binding?['enabled'] == false) return;
       final restored = await GoogleDriveAuthService.instance
           .reconnectSilently();
-      if (mounted && restored != null) {
+      if (!mounted || busy) {
+        restored?.client.close();
+        return;
+      }
+      if (restored != null) {
         setState(() {
           session = restored;
           email = restored.email;
@@ -82,14 +89,17 @@ class _SyncPageState extends ConsumerState<SyncPage>
     _setBusy(true);
     try {
       final connected = await GoogleDriveAuthService.instance.connect();
-      if (!mounted) return;
+      if (!mounted) {
+        connected.client.close();
+        return;
+      }
+      session?.client.close();
       setState(() {
         session = connected;
         email = connected.email;
       });
       final bindingResult = await _ensureVaultBinding(connected);
       if (!mounted || !bindingResult) return;
-      await InitialSyncSnapshot(ref.read(databaseProvider)).enqueue();
       await _saveSetting('sync.google_drive', {
         'connected': true,
         'email': connected.email,
@@ -99,7 +109,7 @@ class _SyncPageState extends ConsumerState<SyncPage>
       if (mounted) {
         await showAppError(
           context,
-          'Não foi possível conectar. Verifique a configuração OAuth da plataforma.',
+          'Não foi possível concluir a ligação ao Google Drive.',
           details: error,
         );
       }
@@ -126,12 +136,6 @@ class _SyncPageState extends ConsumerState<SyncPage>
         .read(databaseProvider)
         .select(ref.read(databaseProvider).companies)
         .getSingle();
-    final saved = await DriveVaultService.binding(ref.read(databaseProvider));
-    if (saved != null &&
-        saved['companyId'] == company.id &&
-        saved['accountId'] == connected.accountId) {
-      return true;
-    }
     final claims = await vault.identity.claims();
     final existing = claims
         .where((claim) => claim.companyId == company.id)
@@ -142,34 +146,18 @@ class _SyncPageState extends ConsumerState<SyncPage>
         company.id,
         connected.accountId,
       );
-      final key = await _recoveryKeyDialog(existingBackup: true);
-      if (key == null) return false;
-      if (await _businessRecordCount() == 0) {
-        final history = await vault.backups(company.id, claimId: claim.id);
-        if (history.isEmpty) {
-          throw StateError('Não existe backup desta loja no Google Drive.');
-        }
-        await vault.restore(claim, history.first, key);
-        await _restartAfterRecovery();
-        return false;
+      final savedKey = await vault.secrets.read(
+        'key.${company.id}.${connected.accountId}',
+      );
+      if (savedKey != null) {
+        await vault.reconnect(claim);
+      } else {
+        if (!mounted) return false;
+        final key = await requestDriveRecoveryKey(context);
+        if (key == null) return false;
+        await vault.reconnect(claim, recoveryKey: key);
       }
-      await vault.reconnect(claim, recoveryKey: key);
       return true;
-    }
-    if (claims.isNotEmpty && await _businessRecordCount() == 0) {
-      final claim = claims.first;
-      if (claim.accountId != connected.accountId) {
-        throw StateError('A conta Google não corresponde à loja selecionada.');
-      }
-      final key = await _recoveryKeyDialog(existingBackup: true);
-      if (key == null) return false;
-      final history = await vault.backups(claim.companyId, claimId: claim.id);
-      if (history.isEmpty) {
-        throw StateError('Não existe backup desta loja no Google Drive.');
-      }
-      await vault.restore(claim, history.first, key);
-      await _restartAfterRecovery();
-      return false;
     }
     final key = await _recoveryKeyDialog(existingBackup: false);
     if (key == null) return false;
@@ -181,17 +169,6 @@ class _SyncPageState extends ConsumerState<SyncPage>
       );
     }
     return true;
-  }
-
-  Future<int> _businessRecordCount() async {
-    final db = ref.read(databaseProvider);
-    final row = await db.customSelect('''
-      SELECT (SELECT COUNT(*) FROM products WHERE deleted_at IS NULL) +
-      (SELECT COUNT(*) FROM sales WHERE deleted_at IS NULL) +
-      (SELECT COUNT(*) FROM purchases WHERE deleted_at IS NULL) +
-      (SELECT COUNT(*) FROM inventory_movements) AS total
-    ''').getSingle();
-    return row.read<int>('total');
   }
 
   Future<String?> _recoveryKeyDialog({required bool existingBackup}) async {
@@ -212,7 +189,7 @@ class _SyncPageState extends ConsumerState<SyncPage>
           children: [
             Text(
               existingBackup
-                  ? 'Introduza a chave de recuperação da loja para transferir a caixa para este computador.'
+                  ? 'Introduza a chave de recuperação da loja para sincronizar este dispositivo.'
                   : 'Guarde esta chave num local seguro. Ela será necessária para restaurar a loja num computador novo.',
             ),
             const SizedBox(height: 12),
@@ -264,25 +241,41 @@ class _SyncPageState extends ConsumerState<SyncPage>
       ),
     );
     if (confirmed != true) return;
-    await GoogleDriveAuthService.instance.disconnect();
-    await _saveSetting('sync.google_drive', {'connected': false});
-    final vaultBinding = await DriveVaultService.binding(
-      ref.read(databaseProvider),
-    );
-    if (vaultBinding != null) {
-      await DriveVaultService.setting(
-        ref.read(databaseProvider),
-        DriveVaultService.bindingSetting,
-        {...vaultBinding, 'enabled': false},
-      );
-    }
-    session?.client.close();
-    if (mounted) {
-      setState(() {
-        session = null;
-        email = null;
-        lastMessage = 'Conta desconectada. Dados locais preservados.';
+    _setBusy(true);
+    try {
+      // Disable locally first, under the same lock as every automatic sync.
+      final db = ref.read(databaseProvider);
+      await VaultLock.run(() async {
+        final binding = await DriveVaultService.binding(db);
+        if (binding != null) {
+          await DriveVaultService.setting(
+            db,
+            DriveVaultService.bindingSetting,
+            {...binding, 'enabled': false},
+          );
+        }
+        await _saveSetting('sync.google_drive', {'connected': false});
       });
+      session?.client.close();
+      if (mounted) {
+        setState(() {
+          session = null;
+          email = null;
+          lastMessage =
+              'Conta desconectada. Dados e alterações locais preservados.';
+        });
+      }
+      await GoogleDriveAuthService.instance.disconnect();
+    } catch (error) {
+      if (mounted) {
+        await showAppError(
+          context,
+          'Não foi possível concluir a saída da conta Google.',
+          details: error,
+        );
+      }
+    } finally {
+      _setBusy(false);
     }
   }
 
@@ -316,59 +309,38 @@ class _SyncPageState extends ConsumerState<SyncPage>
       // The current token may still be valid; the transport reports failure.
     }
     try {
-      final message = await (await _vault(current!)).synchronize();
-      if (!mounted) return;
-      _setBusy(false);
-      setState(() => lastMessage = message);
-      return;
-    } catch (_) {
-      // Keep the legacy operation log as a compatibility fallback for stores
-      // connected before the encrypted vault was introduced.
-    }
-    final transport = GoogleDriveSyncTransport(current!.client);
-    final result = await SyncEngine(
-      ref.read(databaseProvider),
-      transport,
-    ).synchronize();
-    if (!mounted) return;
-    _setBusy(false);
-    setState(() {
-      lastMessage = switch (result) {
-        Success(:final value) =>
-          'Concluído: ${value.uploaded} enviadas, ${value.applied} recebidas, ${value.ignored} ignoradas.',
-        Failure(:final error) => error.userMessage,
-      };
-    });
-    if (result case Failure(:final error)) {
-      await showAppFailure(context, error);
-    }
-    if (result is Success<SyncSummary>) {
-      await DriveRecoverySnapshot(
+      final binding = await DriveVaultService.binding(
         ref.read(databaseProvider),
-        transport,
+      );
+      if (binding == null || binding['enabled'] != true) {
+        if (!await _ensureVaultBinding(current!)) return;
+      }
+      final message = await (await _vault(current!)).synchronize();
+      final recovery = await DriveRecoverySnapshot(
+        ref.read(databaseProvider),
+        GoogleDriveSyncTransport(current.client),
       ).uploadLatest();
-      await _saveSetting('sync.last_success', {
-        'at': DateTime.now().toUtc().toIso8601String(),
-        'summary': lastMessage ?? '',
-      });
-    } else {
+      if (recovery case Failure(:final error)) {
+        throw StateError('${error.userMessage} ${error.cause ?? ''}');
+      }
+      if (mounted) setState(() => lastMessage = message);
+    } catch (error) {
+      final message = error is StateError ? error.message : error.toString();
       await _saveSetting('sync.last_failure', {
         'at': DateTime.now().toUtc().toIso8601String(),
-        'message': lastMessage ?? '',
+        'message': message,
       });
+      if (mounted) {
+        setState(() => lastMessage = 'Sincronização não concluída: $message');
+        await showAppError(
+          context,
+          'Não foi possível sincronizar.',
+          details: error,
+        );
+      }
+    } finally {
+      if (mounted) _setBusy(false);
     }
-  }
-
-  Future<void> _restartAfterRecovery() async {
-    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
-      await Process.start(
-        Platform.resolvedExecutable,
-        const [],
-        mode: ProcessStartMode.detached,
-      );
-      exit(0);
-    }
-    await SystemNavigator.pop();
   }
 
   Future<void> _saveSetting(String key, Map<String, Object> value) => ref
@@ -454,12 +426,19 @@ class _SyncPageState extends ConsumerState<SyncPage>
                         ],
                       ),
                       if (email != null) Text(email!),
+                      if (session != null)
+                        OutlinedButton.icon(
+                          onPressed: busy ? null : disconnect,
+                          icon: const Icon(Icons.link_off),
+                          label: const Text('Desconectar conta Google Drive'),
+                        ),
                       const SizedBox(height: 12),
                       Text(
                         pending == 0
-                            ? 'Nenhuma alteração pendente'
+                            ? 'A sincronização verifica todos os dados locais e do Drive'
                             : '$pending alterações pendentes',
                       ),
+                      _SyncFailureStatus(db: db),
                       if (lastMessage != null)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
@@ -477,7 +456,11 @@ class _SyncPageState extends ConsumerState<SyncPage>
                           ),
                         ),
                         label: Text(
-                          busy ? 'Sincronizando…' : 'Sincronizar agora',
+                          busy
+                              ? 'Sincronizando…'
+                              : session == null
+                              ? 'Conectar e sincronizar'
+                              : 'Sincronizar agora',
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -494,4 +477,35 @@ class _SyncPageState extends ConsumerState<SyncPage>
       ),
     );
   }
+}
+
+class _SyncFailureStatus extends StatelessWidget {
+  const _SyncFailureStatus({required this.db});
+  final AppDatabase db;
+
+  @override
+  Widget build(BuildContext context) => StreamBuilder<AppSetting?>(
+    stream: (db.select(
+      db.appSettings,
+    )..where((s) => s.key.equals('sync.last_failure'))).watchSingleOrNull(),
+    builder: (context, snapshot) {
+      final row = snapshot.data;
+      if (row == null) return const SizedBox.shrink();
+      String message;
+      try {
+        message =
+            (jsonDecode(row.valueJson) as Map<String, dynamic>)['message']
+                as String;
+      } on Object {
+        message = 'Não foi possível concluir a última sincronização.';
+      }
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text(
+          'Última tentativa falhou: $message',
+          style: TextStyle(color: Theme.of(context).colorScheme.error),
+        ),
+      );
+    },
+  );
 }
