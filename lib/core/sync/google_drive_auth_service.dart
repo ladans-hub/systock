@@ -26,7 +26,7 @@ class GoogleDriveAuthService {
       defaultTargetPlatform == TargetPlatform.windows ||
       defaultTargetPlatform == TargetPlatform.linux ||
       (defaultTargetPlatform == TargetPlatform.macOS &&
-          (DesktopGoogleAuth.clientId.isNotEmpty || _appleClientId.isEmpty));
+          DesktopGoogleAuth.clientId.isNotEmpty);
 
   static const _appleClientId = String.fromEnvironment(
     'GOOGLE_APPLE_CLIENT_ID',
@@ -54,6 +54,10 @@ class GoogleDriveAuthService {
     if (defaultTargetPlatform == TargetPlatform.macOS &&
         _appleClientId.isNotEmpty) {
       return _appleClientId;
+    }
+    if (defaultTargetPlatform == TargetPlatform.macOS &&
+        _iosClientId.isNotEmpty) {
+      return _iosClientId;
     }
     return null;
   }
