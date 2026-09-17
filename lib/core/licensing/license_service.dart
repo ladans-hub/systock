@@ -55,6 +55,20 @@ class LicenseService {
   LicenseService(this.db);
   final AppDatabase db;
 
+  static const storeLicenseSetting = 'license.store_lifetime';
+
+  static bool validLifetimeCode(String code) {
+    final parsed = parseCode(code);
+    return parsed != null &&
+        parsed.$1 == LicensePlan.lifetime &&
+        verifyCode(
+          code,
+          plan: parsed.$1,
+          expiresAt: parsed.$2,
+          deviceId: parsed.$3,
+        );
+  }
+
   Future<LicenseStatus> status() async {
     // Apenas para demonstrações/testes locais, sem alterar os dados reais.
     if (const bool.fromEnvironment('SYSTOCK_EXPIRED_TEST')) {
@@ -63,6 +77,29 @@ class LicenseService {
     final now = DateTime.now().toUtc();
     final code = await _value('license.code');
     final company = await db.select(db.companies).getSingleOrNull();
+    final shared = await _value(storeLicenseSetting);
+    final binding = await _value('sync.drive_v2');
+    if (shared != null && binding != null && company != null) {
+      try {
+        final grant = jsonDecode(shared) as Map<String, dynamic>;
+        final account = jsonDecode(binding) as Map<String, dynamic>;
+        if (grant['companyId'] == company.id &&
+            account['companyId'] == company.id &&
+            grant['accountId'] == account['accountId'] &&
+            grant['code'] is String &&
+            validLifetimeCode(grant['code'] as String)) {
+          return const LicenseStatus(
+            active: true,
+            trial: false,
+            plan: LicensePlan.lifetime,
+          );
+        }
+      } on FormatException {
+        // Invalid cached data must not grant an activation.
+      } on TypeError {
+        // Invalid cached data must not grant an activation.
+      }
+    }
     final expiryText = await _value('license.expires_at');
     final plan = LicensePlan.fromCode(await _value('license.plan') ?? '');
     final expiry = expiryText == null ? null : DateTime.tryParse(expiryText);

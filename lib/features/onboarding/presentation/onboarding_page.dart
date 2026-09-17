@@ -13,6 +13,11 @@ import 'package:systock/features/onboarding/application/setup_company.dart';
 import 'package:systock/core/sync/google_drive_auth_service.dart';
 import 'package:systock/core/sync/google_drive_transport.dart';
 import 'package:systock/core/sync/drive_recovery_snapshot.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:systock/core/sync/drive_vault_service.dart';
+import 'package:systock/core/sync/drive_vault_store.dart';
+import 'package:systock/core/sync/drive_vault_identity.dart';
+import 'package:systock/core/sync/drive_connection_dialogs.dart';
 import 'package:systock/core/security/session_state.dart';
 import 'package:systock/core/widgets/secure_text_field.dart';
 import 'package:systock/core/licensing/license_service.dart';
@@ -60,10 +65,37 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       );
       if (!mounted) return;
       setState(() => recoveryStage = 'A recuperar os dados…');
-      final result = await DriveRecoverySnapshot(
-        ref.read(databaseProvider),
-        GoogleDriveSyncTransport(session.client),
-      ).restoreIfLocalIsFresh();
+      final db = ref.read(databaseProvider);
+      final vault = DriveVaultService(
+        db,
+        GoogleDriveVaultStore(session.client),
+        const SecureVaultSecrets(),
+        await getApplicationDocumentsDirectory(),
+        accountId: session.accountId,
+        email: session.email,
+      );
+      final claims = await vault.identity.claims();
+      final Result<InitialDriveRecovery> result;
+      if (claims.isNotEmpty) {
+        final stores = [
+          for (final companyId in claims.map((c) => c.companyId).toSet())
+            DriveVaultIdentity.active(claims, companyId, session.accountId),
+        ];
+        if (!mounted) return;
+        final claim = await selectDriveStore(context, stores);
+        if (claim == null || !mounted) return;
+        final key = await requestDriveRecoveryKey(context);
+        if (key == null || !mounted) return;
+        await vault.join(claim, key);
+        await vault.synchronize();
+        result = const Success(InitialDriveRecovery.restored);
+      } else {
+        // Compatibility with accounts created before encrypted vaults existed.
+        result = await DriveRecoverySnapshot(
+          db,
+          GoogleDriveSyncTransport(session.client),
+        ).restoreIfLocalIsFresh();
+      }
       if (!mounted) return;
       switch (result) {
         case Success(value: InitialDriveRecovery.restored):
@@ -97,11 +129,12 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
           'A ligação ao Google demorou demasiado (${error.message ?? 'sem etapa'}). Verifique a Internet e tente novamente.',
         );
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         await showAppError(
           context,
-          'Não foi possível conectar ao Google Drive.',
+          'Não foi possível recuperar os dados do Google Drive.',
+          details: error,
         );
       }
     } finally {

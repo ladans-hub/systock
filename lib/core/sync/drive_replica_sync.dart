@@ -345,7 +345,13 @@ class DriveReplicaSync {
 
   Future<void> _writeRow(String table, Map<String, dynamic> change) async {
     final data = Map<String, dynamic>.from(change['data'] as Map);
-    if (table == 'companies') data['device_id'] = deviceId;
+    if (table == 'companies') {
+      final local = await (db.select(
+        db.companies,
+      )..where((c) => c.id.equals(companyId))).getSingleOrNull();
+      // The existing device identity also binds the offline activation code.
+      data['device_id'] = local?.deviceId ?? deviceId;
+    }
     final column = table == 'products'
         ? 'image_path'
         : table == 'companies'

@@ -144,32 +144,45 @@ class AdaptiveShell extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        const _BrandMark(),
-                        const SizedBox(width: 10),
-                        IconButton(
-                          visualDensity: VisualDensity.compact,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(
-                            minWidth: 36,
-                            minHeight: 36,
-                          ),
-                          onPressed: () => context.go('/alerts'),
-                          icon: const Icon(
-                            Icons.notifications_outlined,
-                            size: 21,
-                          ),
-                          tooltip: 'Alertas'.localized(context),
-                        ),
-                        const SizedBox(width: 6),
-                        const Chip(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final stackStatus =
+                            constraints.maxWidth < 400 ||
+                            MediaQuery.textScalerOf(context).scale(14) > 18;
+                        const status = Chip(
                           visualDensity: VisualDensity.compact,
                           padding: EdgeInsets.zero,
                           avatar: Icon(Icons.offline_bolt_outlined, size: 15),
                           label: LocalizedText('SQLite local'),
-                        ),
-                      ],
+                        );
+                        final heading = Row(
+                          children: [
+                            const Expanded(child: _BrandMark()),
+                            const SizedBox(width: 10),
+                            IconButton(
+                              onPressed: () => context.go('/alerts'),
+                              icon: const Icon(
+                                Icons.notifications_outlined,
+                                size: 21,
+                              ),
+                              tooltip: 'Alertas'.localized(context),
+                            ),
+                            if (!stackStatus) ...[
+                              const SizedBox(width: 6),
+                              status,
+                            ],
+                          ],
+                        );
+                        if (!stackStatus) return heading;
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            heading,
+                            const SizedBox(height: 4),
+                            status,
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ),

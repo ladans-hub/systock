@@ -312,10 +312,19 @@ class _SyncPageState extends ConsumerState<SyncPage>
       final binding = await DriveVaultService.binding(
         ref.read(databaseProvider),
       );
-      if (binding == null || binding['enabled'] != true) {
-        if (!await _ensureVaultBinding(current!)) return;
+      final vault = await _vault(current!);
+      final savedKey = binding == null
+          ? null
+          : await vault.secrets.read(
+              'key.${binding['companyId']}.${current.accountId}',
+            );
+      if (binding == null ||
+          binding['enabled'] != true ||
+          binding['accountId'] != current.accountId ||
+          savedKey == null) {
+        if (!await _ensureVaultBinding(current)) return;
       }
-      final message = await (await _vault(current!)).synchronize();
+      final message = await vault.synchronize();
       final recovery = await DriveRecoverySnapshot(
         ref.read(databaseProvider),
         GoogleDriveSyncTransport(current.client),

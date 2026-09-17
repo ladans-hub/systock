@@ -137,10 +137,45 @@ class AlertService {
       }
       for (final row in expiryRows) {
         final lotId = row.read<String>('lot_id');
-        final expiresAt = DateTime.parse(
-          row.read<String>('expires_at'),
-        ).toUtc();
-        final days = expiresAt.difference(now).inDays;
+        // Drift stores DateTime columns as Unix timestamps, not date strings.
+        final expiresAt = row.read<DateTime>('expires_at').toUtc();
+        final expiryDate = DateTime.utc(
+          expiresAt.year,
+          expiresAt.month,
+          expiresAt.day,
+        );
+        final today = DateTime.utc(now.year, now.month, now.day);
+        final days = expiryDate.difference(today).inDays;
+        final name = row.read<String>('name');
+        final batch = row.read<String>('batch_number');
+        final title = days < 0
+            ? 'Produto vencido'
+            : days <= 7
+            ? 'Produto vence em breve'
+            : 'Validade próxima';
+        final body = days < 0
+            ? '$name · lote $batch está vencido.'
+            : days == 0
+            ? '$name · lote $batch vence hoje.'
+            : days == 1
+            ? '$name · lote $batch vence em 1 dia.'
+            : '$name · lote $batch vence em $days dias.';
+        // Repair existing alerts immediately, even inside the reminder cadence.
+        await (_db.update(_db.notifications)..where(
+              (n) =>
+                  n.companyId.equals(companyId) &
+                  n.type.equals('expiry') &
+                  n.entityId.equals(lotId) &
+                  n.deletedAt.isNull() &
+                  n.archivedAt.isNull(),
+            ))
+            .write(
+              NotificationsCompanion(
+                title: Value(title),
+                body: Value(body),
+                updatedAt: Value(now),
+              ),
+            );
         final cadence = days <= 7
             ? const Duration(days: 1)
             : const Duration(days: 7);
@@ -156,8 +191,6 @@ class AlertService {
                   ..limit(1))
                 .getSingleOrNull();
         if (last != null && now.difference(last.createdAt) < cadence) continue;
-        final name = row.read<String>('name');
-        final batch = row.read<String>('batch_number');
         await _db
             .into(_db.notifications)
             .insert(
@@ -165,14 +198,8 @@ class AlertService {
                 id: _uuid.v7(),
                 companyId: companyId,
                 type: 'expiry',
-                title: days < 0
-                    ? 'Produto vencido'
-                    : days <= 7
-                    ? 'Produto vence em breve'
-                    : 'Validade próxima',
-                body: days < 0
-                    ? '$name · lote $batch está vencido.'
-                    : '$name · lote $batch vence em $days dias.',
+                title: title,
+                body: body,
                 entityId: Value(lotId),
                 createdAt: now,
                 updatedAt: now,

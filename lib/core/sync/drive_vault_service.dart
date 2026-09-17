@@ -1,3 +1,5 @@
+import 'package:crypto/crypto.dart';
+import 'package:systock/core/licensing/license_service.dart';
 import 'package:sqlite3/sqlite3.dart' as native;
 import 'dart:async';
 import 'dart:convert';
@@ -156,7 +158,6 @@ class DriveVaultService {
     await _bind(claim);
   });
   Future<void> _bind(VaultClaim claim) async {
-    final deviceId = await identity.installationId();
     await db.transaction(() async {
       await setting(db, bindingSetting, {
         ...claim.toJson(),
@@ -164,9 +165,6 @@ class DriveVaultService {
         'enabled': true,
         'mode': 'replica',
       });
-      await (db.update(db.companies)
-            ..where((c) => c.id.equals(claim.companyId)))
-          .write(CompaniesCompanion(deviceId: Value(deviceId)));
     });
   }
 
@@ -215,6 +213,48 @@ class DriveVaultService {
       store.list(
         'systock-v2-backup-$companyId-${claimId == null ? '' : '$claimId-'}',
       );
+
+  Future<void> _synchronizeLifetimeLicense(VaultClaim claim, String key) async {
+    final prefix = 'systock-v3-license-${claim.companyId}-';
+    final localCode = await (db.select(
+      db.appSettings,
+    )..where((s) => s.key.equals('license.code'))).getSingleOrNull();
+    final localCompany = await db.select(db.companies).getSingleOrNull();
+    // Older sync versions changed the local device id. The signed lifetime
+    // activation already stored with this shop remains valid for the shop.
+    if (localCompany?.id == claim.companyId &&
+        localCode != null &&
+        LicenseService.validLifetimeCode(localCode.valueJson)) {
+      final grant = {
+        'companyId': claim.companyId,
+        'accountId': accountId,
+        'code': localCode.valueJson,
+      };
+      final bytes = utf8.encode(jsonEncode(grant));
+      await store.create(
+        '$prefix${sha256.convert(bytes)}.bin',
+        await VaultCipher.encrypt(bytes, key, claim.companyId),
+      );
+      await setting(db, LicenseService.storeLicenseSetting, grant);
+    }
+    for (final file in await store.list(prefix)) {
+      final grant = decodeVaultJson(
+        await VaultCipher.decrypt(
+          await store.read(file.id),
+          key,
+          claim.companyId,
+        ),
+      );
+      if (grant['companyId'] != claim.companyId ||
+          grant['accountId'] != accountId ||
+          grant['code'] is! String ||
+          !LicenseService.validLifetimeCode(grant['code'] as String)) {
+        throw StateError('A licença do Google Drive não corresponde à loja.');
+      }
+      await setting(db, LicenseService.storeLicenseSetting, grant);
+      return;
+    }
+  }
 
   Future<String> synchronize({bool force = false}) => VaultLock.run(() async {
     final saved = await binding(db);
@@ -295,6 +335,7 @@ class DriveVaultService {
       key: key,
       documents: documents,
     ).synchronize();
+    await _synchronizeLifetimeLicense(claim, key);
     final message = result.uploaded == 0 && result.received == 0
         ? 'Verificação concluída. Nenhuma alteração nova no dispositivo ou no Drive.'
         : 'Concluído: ${result.uploaded} alterações enviadas, ${result.received} recebidas.';

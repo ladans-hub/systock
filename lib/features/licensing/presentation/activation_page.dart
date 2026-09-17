@@ -19,6 +19,7 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
   String? error;
   bool saving = false;
   LicenseStatus? currentStatus;
+  String? deviceId;
 
   ({String label, String price, String detail, IconData icon, bool popular})
   _planData(LicensePlan plan) => switch (plan) {
@@ -55,9 +56,27 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
   @override
   void initState() {
     super.initState();
-    LicenseService(ref.read(databaseProvider)).status().then((value) {
-      if (mounted) setState(() => currentStatus = value);
-    });
+    _loadLicense();
+  }
+
+  Future<void> _loadLicense() async {
+    final db = ref.read(databaseProvider);
+    final company = await db.select(db.companies).getSingleOrNull();
+    if (!mounted) return;
+    setState(() => deviceId = company?.deviceId);
+    final status = await LicenseService(db).status();
+    if (!mounted) return;
+    setState(() => currentStatus = status);
+  }
+
+  Future<void> _copyDeviceId() async {
+    final id = deviceId;
+    if (id == null || id.isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: id));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('ID do dispositivo copiado'.localized(context))),
+    );
   }
 
   @override
@@ -262,7 +281,7 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
                         const SizedBox(height: 24),
                         TextField(
                           controller: code,
-                          autofocus: true,
+                          autofocus: false,
                           maxLength: 100,
                           keyboardType: TextInputType.text,
                           inputFormatters: [
@@ -294,6 +313,33 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
                             ),
                           ),
                         ),
+                        if (deviceId != null) ...[
+                          const SizedBox(height: 20),
+                          Text(
+                            'ID do dispositivo'.localized(context),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 4),
+                          SelectableText(
+                            deviceId!,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(context).colorScheme.primary,
+                                ),
+                          ),
+                          TextButton.icon(
+                            onPressed: _copyDeviceId,
+                            style: TextButton.styleFrom(
+                              foregroundColor: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                              textStyle: Theme.of(context).textTheme.labelSmall,
+                            ),
+                            icon: const Icon(Icons.copy_outlined, size: 16),
+                            label: const LocalizedText('Copiar ID'),
+                          ),
+                        ],
                       ],
                     ),
                   ),

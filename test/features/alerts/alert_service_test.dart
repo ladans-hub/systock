@@ -126,6 +126,56 @@ void main() {
         db.notifications,
       )..where((n) => n.type.equals('expiry'))).getSingle();
       expect(expiryAlert.entityId, 'l1');
+      expect(expiryAlert.title, 'Produto vence em breve');
+      expect(expiryAlert.body, 'Arroz · lote A1 vence em 6 dias.');
+
+      // Previously generated bad text must be repaired without waiting a day.
+      await (db.update(
+        db.notifications,
+      )..where((n) => n.id.equals(expiryAlert.id))).write(
+        const NotificationsCompanion(
+          body: Value('Arroz · lote A1 vence em 64682696 dias.'),
+        ),
+      );
+      await service.refresh('c1', 'd1');
+      var repaired = await (db.select(
+        db.notifications,
+      )..where((n) => n.type.equals('expiry'))).getSingle();
+      expect(repaired.id, expiryAlert.id);
+      expect(repaired.body, 'Arroz · lote A1 vence em 6 dias.');
+
+      final today = DateTime.utc(now.year, now.month, now.day);
+      for (final offset in [0, 1, -1, 20]) {
+        await db
+            .update(db.lots)
+            .write(
+              LotsCompanion(
+                expiresAt: Value(today.add(Duration(days: offset))),
+              ),
+            );
+        await service.refresh('c1', 'd1');
+        repaired = await (db.select(
+          db.notifications,
+        )..where((n) => n.type.equals('expiry'))).getSingle();
+        expect(repaired.body, switch (offset) {
+          0 => 'Arroz · lote A1 vence hoje.',
+          1 => 'Arroz · lote A1 vence em 1 dia.',
+          -1 => 'Arroz · lote A1 está vencido.',
+          _ => 'Arroz · lote A1 vence em 20 dias.',
+        });
+      }
+      await db
+          .update(db.lots)
+          .write(
+            LotsCompanion(
+              expiresAt: Value(today.add(const Duration(days: 60))),
+            ),
+          );
+      await service.refresh('c1', 'd1');
+      repaired = await (db.select(
+        db.notifications,
+      )..where((n) => n.type.equals('expiry'))).getSingle();
+      expect(repaired.archivedAt, isNotNull);
 
       await db
           .into(db.inventoryMovements)

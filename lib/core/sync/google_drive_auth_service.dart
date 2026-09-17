@@ -32,12 +32,6 @@ class GoogleDriveAuthService {
     'GOOGLE_APPLE_CLIENT_ID',
   );
   static const _iosClientId = String.fromEnvironment('GOOGLE_IOS_CLIENT_ID');
-  static const _androidClientId = String.fromEnvironment(
-    'GOOGLE_ANDROID_CLIENT_ID',
-  );
-  static const _desktopClientId = String.fromEnvironment(
-    'GOOGLE_DESKTOP_CLIENT_ID',
-  );
   static const _serverClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
   );
@@ -50,10 +44,9 @@ class GoogleDriveAuthService {
       if (_iosClientId.isNotEmpty) return _iosClientId;
       if (_appleClientId.isNotEmpty) return _appleClientId;
     }
-    if (defaultTargetPlatform == TargetPlatform.android &&
-        _androidClientId.isNotEmpty) {
-      return _androidClientId;
-    }
+    // Android identifies the app by package name and signing certificate.
+    // Passing its Android OAuth id here incorrectly requests a server token.
+    if (defaultTargetPlatform == TargetPlatform.android) return null;
     if (defaultTargetPlatform == TargetPlatform.macOS &&
         _appleClientId.isNotEmpty) {
       return _appleClientId;
@@ -67,15 +60,16 @@ class GoogleDriveAuthService {
 
   Future<void> initialize({String? clientId, String? serverClientId}) async {
     if (_initialized) return;
+    // Only a Web OAuth client may be used as serverClientId. Drive access
+    // with google_sign_in 6.x does not require a backend or server token.
     final configuredServerClientId = _serverClientId.isNotEmpty
         ? _serverClientId
-        : (defaultTargetPlatform == TargetPlatform.android &&
-                  _desktopClientId.isNotEmpty
-              ? _desktopClientId
-              : null);
+        : null;
     _signIn = GoogleSignIn(
       scopes: const [GoogleDriveSyncTransport.requiredScope],
-      clientId: clientId ?? configuredClientId,
+      clientId: defaultTargetPlatform == TargetPlatform.android
+          ? null
+          : clientId ?? configuredClientId,
       serverClientId: serverClientId ?? configuredServerClientId,
     );
     _initialized = true;

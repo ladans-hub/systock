@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:drift/drift.dart' show OrderingTerm;
@@ -34,11 +35,28 @@ class _StartupPageState extends ConsumerState<StartupPage> {
   int trialDaysLeft = 0;
   LicensePlan? expiredPlan;
   String deviceId = '';
+  StreamSubscription<String?>? _licenseSubscription;
 
   @override
   void initState() {
     super.initState();
     Future.microtask(_start);
+    final db = ref.read(databaseProvider);
+    _licenseSubscription =
+        (db.select(db.appSettings)
+              ..where((s) => s.key.equals(LicenseService.storeLicenseSetting)))
+            .watchSingleOrNull()
+            .map((row) => row?.valueJson)
+            .distinct()
+            .listen((_) async {
+              final license = await LicenseService(db).status();
+              if (!mounted) return;
+              setState(() {
+                licenseExpired = !license.active;
+                trialDaysLeft = license.trialDaysLeft;
+                expiredPlan = license.plan;
+              });
+            });
   }
 
   Future<void> _start() async {
@@ -303,6 +321,7 @@ class _StartupPageState extends ConsumerState<StartupPage> {
 
   @override
   void dispose() {
+    _licenseSubscription?.cancel();
     pin.dispose();
     super.dispose();
   }

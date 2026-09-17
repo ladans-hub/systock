@@ -159,6 +159,8 @@ const _english = <String, String>{
       'Contact LADANS to get your activation code.',
   'Contactar': 'Contact',
   'Copiar': 'Copy',
+  'ID do dispositivo': 'Device ID',
+  'Copiar ID': 'Copy ID',
   'ID do dispositivo copiado': 'Device ID copied',
   'Envie este ID para gerar o código de ativação:':
       'Send this ID to generate the activation code:',
