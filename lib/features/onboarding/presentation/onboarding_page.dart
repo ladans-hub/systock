@@ -90,11 +90,11 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         case Failure(:final error):
           showAppFailure(context, error);
       }
-    } on TimeoutException {
+    } on TimeoutException catch (error) {
       if (mounted) {
         await showAppError(
           context,
-          'A ligação ao Google demorou demasiado. Verifique a Internet e tente novamente.',
+          'A ligação ao Google demorou demasiado (${error.message ?? 'sem etapa'}). Verifique a Internet e tente novamente.',
         );
       }
     } catch (_) {
@@ -179,126 +179,130 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Icon(
-                    Icons.inventory_rounded,
-                    size: 52,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(height: 16),
-                  LocalizedText(
-                    'Bem-vindo ao Systock',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  const LocalizedText(
-                    'Controle stock, vendas e compras sem depender da Internet.',
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 28),
-                  TextField(
-                    controller: company,
-                    decoration: InputDecoration(
-                      labelText: 'Nome comercial'.localized(context),
+    body: SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Icon(
+                      Icons.inventory_rounded,
+                      size: 52,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: admin,
-                    decoration: InputDecoration(
-                      labelText: 'Nome do administrador'.localized(context),
+                    const SizedBox(height: 16),
+                    LocalizedText(
+                      'Bem-vindo ao Systock',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineMedium,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: username,
-                    decoration: InputDecoration(
-                      labelText: 'Utilizador'.localized(context),
+                    const SizedBox(height: 8),
+                    const LocalizedText(
+                      'Controle stock, vendas e compras sem depender da Internet.',
+                      textAlign: TextAlign.center,
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  SecureTextField(
-                    controller: pin,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'PIN de acesso opcional (4–12 dígitos)'
-                          .localized(context),
+                    const SizedBox(height: 28),
+                    TextField(
+                      controller: company,
+                      decoration: InputDecoration(
+                        labelText: 'Nome comercial'.localized(context),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  const Divider(),
-                  const LocalizedText(
-                    'Login do vendedor (acesso somente ao Ponto de Venda)',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: seller,
-                    decoration: InputDecoration(
-                      labelText: 'Nome do vendedor'.localized(context),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: admin,
+                      decoration: InputDecoration(
+                        labelText: 'Nome do administrador'.localized(context),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: sellerUsername,
-                    decoration: InputDecoration(
-                      labelText: 'Utilizador do vendedor'.localized(context),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: username,
+                      decoration: InputDecoration(
+                        labelText: 'Utilizador'.localized(context),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  SecureTextField(
-                    controller: sellerPin,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'PIN do vendedor'.localized(context),
+                    const SizedBox(height: 12),
+                    SecureTextField(
+                      controller: pin,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'PIN de acesso opcional (4–12 dígitos)'
+                            .localized(context),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField(
-                    initialValue: currency,
-                    decoration: InputDecoration(
-                      labelText: 'Moeda'.localized(context),
+                    const SizedBox(height: 20),
+                    const Divider(),
+                    const LocalizedText(
+                      'Login do vendedor (acesso somente ao Ponto de Venda)',
+                      style: TextStyle(fontWeight: FontWeight.w700),
                     ),
-                    items: const ['MZN', 'USD', 'EUR', 'ZAR']
-                        .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-                        .toList(),
-                    onChanged: (v) => setState(() => currency = v!),
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: saving ? null : submit,
-                    child: Text(
-                      saving && recoveryStage == null
-                          ? 'A configurar…'
-                          : 'Começar',
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: seller,
+                      decoration: InputDecoration(
+                        labelText: 'Nome do vendedor'.localized(context),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: saving ? null : recoverFromDrive,
-                    icon: const Icon(Icons.cloud_download_outlined),
-                    label: LocalizedText(
-                      recoveryStage ?? 'Recuperar da minha Conta Google',
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: sellerUsername,
+                      decoration: InputDecoration(
+                        labelText: 'Utilizador do vendedor'.localized(context),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  const LocalizedText(
-                    'Use esta opção num dispositivo novo para baixar automaticamente os dados já sincronizados.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 12),
-                  ),
-                ],
+                    const SizedBox(height: 12),
+                    SecureTextField(
+                      controller: sellerPin,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'PIN do vendedor'.localized(context),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField(
+                      initialValue: currency,
+                      decoration: InputDecoration(
+                        labelText: 'Moeda'.localized(context),
+                      ),
+                      items: const ['MZN', 'USD', 'EUR', 'ZAR']
+                          .map(
+                            (v) => DropdownMenuItem(value: v, child: Text(v)),
+                          )
+                          .toList(),
+                      onChanged: (v) => setState(() => currency = v!),
+                    ),
+                    const SizedBox(height: 24),
+                    FilledButton(
+                      onPressed: saving ? null : submit,
+                      child: Text(
+                        saving && recoveryStage == null
+                            ? 'A configurar…'
+                            : 'Começar',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(
+                      onPressed: saving ? null : recoverFromDrive,
+                      icon: const Icon(Icons.cloud_download_outlined),
+                      label: LocalizedText(
+                        recoveryStage ?? 'Recuperar da minha Conta Google',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const LocalizedText(
+                      'Use esta opção num dispositivo novo para baixar automaticamente os dados já sincronizados.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

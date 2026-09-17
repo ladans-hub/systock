@@ -19,7 +19,7 @@ class GoogleDriveSession {
 class GoogleDriveAuthService {
   GoogleDriveAuthService._();
   static final instance = GoogleDriveAuthService._();
-  final _signIn = GoogleSignIn.instance;
+  GoogleSignIn? _signIn;
   bool _initialized = false;
   final _desktop = DesktopGoogleAuth();
   bool get usesDesktop =>
@@ -34,6 +34,9 @@ class GoogleDriveAuthService {
   static const _iosClientId = String.fromEnvironment('GOOGLE_IOS_CLIENT_ID');
   static const _androidClientId = String.fromEnvironment(
     'GOOGLE_ANDROID_CLIENT_ID',
+  );
+  static const _desktopClientId = String.fromEnvironment(
+    'GOOGLE_DESKTOP_CLIENT_ID',
   );
   static const _serverClientId = String.fromEnvironment(
     'GOOGLE_SERVER_CLIENT_ID',
@@ -64,10 +67,16 @@ class GoogleDriveAuthService {
 
   Future<void> initialize({String? clientId, String? serverClientId}) async {
     if (_initialized) return;
-    await _signIn.initialize(
+    final configuredServerClientId = _serverClientId.isNotEmpty
+        ? _serverClientId
+        : (defaultTargetPlatform == TargetPlatform.android &&
+                  _desktopClientId.isNotEmpty
+              ? _desktopClientId
+              : null);
+    _signIn = GoogleSignIn(
+      scopes: const [GoogleDriveSyncTransport.requiredScope],
       clientId: clientId ?? configuredClientId,
-      serverClientId:
-          serverClientId ?? (_serverClientId.isEmpty ? null : _serverClientId),
+      serverClientId: serverClientId ?? configuredServerClientId,
     );
     _initialized = true;
   }
@@ -82,16 +91,21 @@ class GoogleDriveAuthService {
       );
     }
     await initialize();
-    final account = await _signIn.authenticate(
-      scopeHint: const [GoogleDriveSyncTransport.requiredScope],
+    final account = await _signIn!.signIn().timeout(
+      const Duration(minutes: 2),
+      onTimeout: () => throw TimeoutException('signIn'),
     );
-    final authorization = await account.authorizationClient.authorizeScopes(
-      const [GoogleDriveSyncTransport.requiredScope],
-    );
+    if (account == null) {
+      throw StateError('O utilizador cancelou o login Google.');
+    }
+    final token = (await account.authentication).accessToken;
+    if (token == null || token.isEmpty) {
+      throw StateError('O Google não devolveu um token de acesso ao Drive.');
+    }
     return GoogleDriveSession(
       email: account.email,
       accountId: account.id,
-      client: _BearerClient(authorization.accessToken),
+      client: _BearerClient(token),
     );
   }
 
@@ -107,15 +121,14 @@ class GoogleDriveAuthService {
             );
     }
     await initialize();
-    final account = await _signIn.attemptLightweightAuthentication();
+    final account = await _signIn!.signInSilently();
     if (account == null) return null;
-    final authorization = await account.authorizationClient
-        .authorizationForScopes(const [GoogleDriveSyncTransport.requiredScope]);
-    if (authorization == null) return null;
+    final token = (await account.authentication).accessToken;
+    if (token == null || token.isEmpty) return null;
     return GoogleDriveSession(
       email: account.email,
       accountId: account.id,
-      client: _BearerClient(authorization.accessToken),
+      client: _BearerClient(token),
     );
   }
 
@@ -125,7 +138,7 @@ class GoogleDriveAuthService {
       return;
     }
     await initialize();
-    await _signIn.signOut();
+    await _signIn!.signOut();
   }
 }
 

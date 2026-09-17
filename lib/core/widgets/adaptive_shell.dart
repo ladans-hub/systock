@@ -52,16 +52,19 @@ class AdaptiveShell extends ConsumerWidget {
       return LayoutBuilder(
         builder: (context, constraints) => constraints.maxWidth < 700
             ? Scaffold(
-                body: child,
-                bottomNavigationBar: NavigationBar(
-                  selectedIndex: 0,
-                  onDestinationSelected: (_) => context.go('/pos'),
-                  destinations: const [
-                    NavigationDestination(
-                      icon: Icon(Icons.point_of_sale_outlined),
-                      label: 'Ponto de venda',
-                    ),
-                  ],
+                body: SafeArea(child: child),
+                bottomNavigationBar: SafeArea(
+                  top: false,
+                  child: NavigationBar(
+                    selectedIndex: 0,
+                    onDestinationSelected: (_) => context.go('/pos'),
+                    destinations: const [
+                      NavigationDestination(
+                        icon: Icon(Icons.point_of_sale_outlined),
+                        label: 'Ponto de venda',
+                      ),
+                    ],
+                  ),
                 ),
               )
             : Scaffold(
@@ -173,7 +176,7 @@ class AdaptiveShell extends ConsumerWidget {
                 Expanded(child: child),
               ],
             )
-          : child,
+          : SafeArea(top: true, bottom: false, child: child),
       bottomNavigationBar: AdaptiveBottomNavigationBar(
         selectedIndex: selected,
         onTap: (i) => i == 4

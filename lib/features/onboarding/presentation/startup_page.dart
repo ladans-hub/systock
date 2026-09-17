@@ -313,235 +313,239 @@ class _StartupPageState extends ConsumerState<StartupPage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.surface,
-              Theme.of(context).colorScheme.primary.withValues(alpha: .07),
-            ],
-          ),
-        ),
-        child: Stack(
-          children: [
-            Align(
-              alignment: Alignment.topLeft,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(28, 24, 20, 20),
-                child: _LoginBrand(
-                  english: Localizations.localeOf(context).languageCode == 'en',
-                ),
-              ),
+      body: SafeArea(
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Theme.of(context).colorScheme.surface,
+                Theme.of(context).colorScheme.primary.withValues(alpha: .07),
+              ],
             ),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 28, bottom: 16),
-                child: Text(
-                  'by | LADANS',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontSize: 10,
-                    fontStyle: FontStyle.italic,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.onSurfaceVariant.withValues(alpha: .72),
+          ),
+          child: Stack(
+            children: [
+              Align(
+                alignment: Alignment.topLeft,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 24, 20, 20),
+                  child: _LoginBrand(
+                    english:
+                        Localizations.localeOf(context).languageCode == 'en',
                   ),
                 ),
               ),
-            ),
-            Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 92, 20, 60),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Card(
-                    elevation: 0,
-                    margin: const EdgeInsets.all(24),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                      side: BorderSide(
-                        color: Theme.of(context).colorScheme.outlineVariant,
-                      ),
+              Align(
+                alignment: Alignment.bottomRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 28, bottom: 16),
+                  child: Text(
+                    'by | LADANS',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      fontSize: 10,
+                      fontStyle: FontStyle.italic,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurfaceVariant.withValues(alpha: .72),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(28, 30, 28, 22),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const SizedBox(height: 4),
-                          LocalizedText(
-                            'Olá, ${user!.name}',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.headlineSmall,
-                          ),
-                          const SizedBox(height: 16),
-                          if (licenseExpired) ...[
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
+                  ),
+                ),
+              ),
+              Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 92, 20, 60),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 420),
+                    child: Card(
+                      elevation: 0,
+                      margin: const EdgeInsets.all(24),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        side: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(28, 30, 28, 22),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const SizedBox(height: 4),
+                            LocalizedText(
+                              'Olá, ${user!.name}',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
+                            const SizedBox(height: 16),
+                            if (licenseExpired) ...[
+                              Container(
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
                                   color: Theme.of(
                                     context,
-                                  ).colorScheme.error.withValues(alpha: .28),
-                                ),
-                              ),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    expiredPlan == null
-                                        ? 'O seu período de teste de 7 dias terminou.'
-                                        : 'O seu plano ${expiredPlan!.label} expirou.',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    'Envie este ID para gerar o código de ativação:'
-                                        .localized(context),
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: SelectableText(
-                                          deviceId,
-                                          textAlign: TextAlign.center,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 12,
-                                          ),
-                                        ),
-                                      ),
-                                      IconButton(
-                                        tooltip: 'Copiar'.localized(context),
-                                        icon: const Icon(Icons.copy_outlined),
-                                        onPressed: _copyDeviceId,
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  FilledButton.icon(
-                                    onPressed: () => context.go('/activation'),
-                                    icon: const Icon(Icons.verified_outlined),
-                                    label: const Text('Ativar agora'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                          if (!licenseExpired && trialDaysLeft > 0) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 11,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .primaryContainer
-                                    .withValues(alpha: .65),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.schedule_outlined,
-                                    size: 20,
+                                  ).colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
                                     color: Theme.of(
                                       context,
-                                    ).colorScheme.primary,
-                                  ),
-                                  const SizedBox(width: 9),
-                                  Expanded(
-                                    child: Text(
-                                      '${'Trial ativo'.localized(context)}: ${'faltam'.localized(context)} $trialDaysLeft ${trialDaysLeft == 1 ? 'dia'.localized(context) : 'dias'.localized(context)}. ${'Faça upgrade para continuar sem interrupções.'.localized(context)}',
-                                      style: const TextStyle(fontSize: 12),
-                                    ),
-                                  ),
-                                  TextButton(
-                                    onPressed: _showPlansModal,
-                                    child: const LocalizedText('Ver planos'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-                          DropdownButtonFormField<String>(
-                            initialValue: user!.id,
-                            decoration: InputDecoration(
-                              labelText: 'Utilizador'.localized(context),
-                            ),
-                            items: [
-                              for (final candidate in users)
-                                DropdownMenuItem(
-                                  value: candidate.id,
-                                  child: Text(
-                                    '${candidate.name} (${candidate.username})',
+                                    ).colorScheme.error.withValues(alpha: .28),
                                   ),
                                 ),
-                            ],
-                            onChanged: (id) => setState(() {
-                              user = users.firstWhere(
-                                (candidate) => candidate.id == id,
-                              );
-                              pin.clear();
-                              error = null;
-                            }),
-                          ),
-                          const SizedBox(height: 20),
-                          if (user!.pinHash != null)
-                            SecureTextField(
-                              controller: pin,
-                              autofocus: true,
-                              keyboardType: TextInputType.number,
-                              onSubmitted: (_) => unlock(),
-                              decoration: InputDecoration(
-                                labelText: 'PIN'.localized(context),
-                                errorText: error,
+                                child: Column(
+                                  children: [
+                                    Text(
+                                      expiredPlan == null
+                                          ? 'O seu período de teste de 7 dias terminou.'
+                                          : 'O seu plano ${expiredPlan!.label} expirou.',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'Envie este ID para gerar o código de ativação:'
+                                          .localized(context),
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: SelectableText(
+                                            deviceId,
+                                            textAlign: TextAlign.center,
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                        IconButton(
+                                          tooltip: 'Copiar'.localized(context),
+                                          icon: const Icon(Icons.copy_outlined),
+                                          onPressed: _copyDeviceId,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    FilledButton.icon(
+                                      onPressed: () =>
+                                          context.go('/activation'),
+                                      icon: const Icon(Icons.verified_outlined),
+                                      label: const Text('Ativar agora'),
+                                    ),
+                                  ],
+                                ),
                               ),
+                              const SizedBox(height: 16),
+                            ],
+                            if (!licenseExpired && trialDaysLeft > 0) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 11,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .primaryContainer
+                                      .withValues(alpha: .65),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.schedule_outlined,
+                                      size: 20,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
+                                    ),
+                                    const SizedBox(width: 9),
+                                    Expanded(
+                                      child: Text(
+                                        '${'Trial ativo'.localized(context)}: ${'faltam'.localized(context)} $trialDaysLeft ${trialDaysLeft == 1 ? 'dia'.localized(context) : 'dias'.localized(context)}. ${'Faça upgrade para continuar sem interrupções.'.localized(context)}',
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: _showPlansModal,
+                                      child: const LocalizedText('Ver planos'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                            DropdownButtonFormField<String>(
+                              initialValue: user!.id,
+                              decoration: InputDecoration(
+                                labelText: 'Utilizador'.localized(context),
+                              ),
+                              items: [
+                                for (final candidate in users)
+                                  DropdownMenuItem(
+                                    value: candidate.id,
+                                    child: Text(
+                                      '${candidate.name} (${candidate.username})',
+                                    ),
+                                  ),
+                              ],
+                              onChanged: (id) => setState(() {
+                                user = users.firstWhere(
+                                  (candidate) => candidate.id == id,
+                                );
+                                pin.clear();
+                                error = null;
+                              }),
                             ),
-                          const SizedBox(height: 16),
-                          FilledButton(
-                            onPressed: unlock,
-                            child: const LocalizedText('Entrar'),
-                          ),
-                          if (user!.pinHash != null)
-                            TextButton.icon(
-                              onPressed: biometric,
-                              icon: const Icon(Icons.fingerprint),
-                              label: const LocalizedText('Usar biometria'),
+                            const SizedBox(height: 20),
+                            if (user!.pinHash != null)
+                              SecureTextField(
+                                controller: pin,
+                                autofocus: true,
+                                keyboardType: TextInputType.number,
+                                onSubmitted: (_) => unlock(),
+                                decoration: InputDecoration(
+                                  labelText: 'PIN'.localized(context),
+                                  errorText: error,
+                                ),
+                              ),
+                            const SizedBox(height: 16),
+                            FilledButton(
+                              onPressed: unlock,
+                              child: const LocalizedText('Entrar'),
                             ),
-                          if (user!.pinHash != null)
-                            TextButton(
-                              onPressed: recoverPin,
-                              child: const LocalizedText('Esqueci o PIN'),
-                            ),
-                        ],
+                            if (user!.pinHash != null)
+                              TextButton.icon(
+                                onPressed: biometric,
+                                icon: const Icon(Icons.fingerprint),
+                                label: const LocalizedText('Usar biometria'),
+                              ),
+                            if (user!.pinHash != null)
+                              TextButton(
+                                onPressed: recoverPin,
+                                child: const LocalizedText('Esqueci o PIN'),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
