@@ -86,8 +86,16 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
         if (claim == null || !mounted) return;
         final key = await requestDriveRecoveryKey(context);
         if (key == null || !mounted) return;
+        setState(() => recoveryStage = 'A validar a chave…');
         await vault.join(claim, key);
-        await vault.synchronize();
+        if (!mounted) return;
+        setState(() => recoveryStage = 'A descarregar os dados…');
+        await vault.synchronize().timeout(
+          const Duration(minutes: 5),
+          onTimeout: () => throw TimeoutException(
+            'A recuperação dos dados demorou demasiado.',
+          ),
+        );
         result = const Success(InitialDriveRecovery.restored);
       } else {
         // Compatibility with accounts created before encrypted vaults existed.

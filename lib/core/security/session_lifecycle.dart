@@ -24,11 +24,7 @@ class _SessionLifecycleState extends ConsumerState<SessionLifecycle>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     syncTimer = Timer.periodic(const Duration(minutes: 2), (_) {
-      unawaited(
-        BackgroundSyncCoordinator(
-          ref.read(databaseProvider),
-        ).synchronizeIfAuthorized(),
-      );
+      _syncIfConfigured();
     });
   }
 
@@ -38,17 +34,19 @@ class _SessionLifecycleState extends ConsumerState<SessionLifecycle>
         state == AppLifecycleState.hidden) {
       backgroundedAt ??= DateTime.now();
     } else if (state == AppLifecycleState.resumed) {
-      unawaited(
-        BackgroundSyncCoordinator(
-          ref.read(databaseProvider),
-        ).synchronizeIfAuthorized(),
-      );
+      _syncIfConfigured();
       final since = backgroundedAt;
       backgroundedAt = null;
       if (since != null && DateTime.now().difference(since) >= timeout) {
         appRouter.go('/');
       }
     }
+  }
+
+  Future<void> _syncIfConfigured() async {
+    final db = ref.read(databaseProvider);
+    if (await db.select(db.companies).getSingleOrNull() == null) return;
+    await BackgroundSyncCoordinator(db).synchronizeIfAuthorized();
   }
 
   @override

@@ -27,7 +27,15 @@ Future<ProviderContainer> bootstrap() async {
   );
   unawaited(database.customStatement('PRAGMA optimize'));
   unawaited(LocalNotificationService.instance.initialize());
-  unawaited(BackgroundSyncCoordinator(database).synchronizeIfAuthorized());
+  // A configuração inicial não tem ainda uma loja nem uma associação Drive.
+  // Evita iniciar o fluxo OAuth em paralelo com o formulário de onboarding;
+  // em Android isso pode reabrir a activity de login repetidamente.
+  final hasCompany = await database
+      .select(database.companies)
+      .getSingleOrNull();
+  if (hasCompany != null) {
+    unawaited(BackgroundSyncCoordinator(database).synchronizeIfAuthorized());
+  }
   unawaited(AutomaticBackupScheduler(database).runIfDue());
   unawaited(_refreshAlerts(database));
   // Mantém as janelas de validade atualizadas enquanto o app permanece aberto.
