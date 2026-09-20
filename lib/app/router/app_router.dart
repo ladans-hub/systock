@@ -1,3 +1,4 @@
+import 'package:systock/features/inventory/presentation/recent_entries_page.dart';
 import 'package:go_router/go_router.dart';
 import 'package:systock/core/widgets/adaptive_shell.dart';
 import 'package:systock/features/dashboard/presentation/dashboard_page.dart';
@@ -87,6 +88,13 @@ final appRouter = GoRouter(
           builder: (_, state) => PermissionGate(
             permission: 'inventory.view',
             child: InventoryProductPage(state.pathParameters['id']!),
+          ),
+        ),
+        GoRoute(
+          path: '/inventory/recent-entries',
+          builder: (_, _) => const PermissionGate(
+            permission: 'inventory.view',
+            child: RecentEntriesPage(),
           ),
         ),
         GoRoute(

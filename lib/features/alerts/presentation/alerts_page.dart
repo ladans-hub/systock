@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/notification_bell.dart';
 import 'package:systock/core/widgets/action_colors.dart';
 import 'package:drift/drift.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -14,11 +15,7 @@ class AlertsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final db = ref.watch(databaseProvider);
-    final query = db.select(db.notifications)
-      ..where(
-        (n) => n.readAt.isNull() & n.archivedAt.isNull() & n.deletedAt.isNull(),
-      )
-      ..orderBy([(n) => OrderingTerm.desc(n.createdAt)]);
+    final notifications = ref.watch(inboxNotificationsProvider);
     return Scaffold(
       appBar: AppBar(
         leading: const AdaptiveBackButton(fallbackPath: '/dashboard'),
@@ -36,10 +33,9 @@ class AlertsPage extends ConsumerWidget {
           ),
         ],
       ),
-      body: StreamBuilder<List<Notification>>(
-        stream: query.watch(),
-        builder: (_, snapshot) {
-          final rows = snapshot.data ?? const [];
+      body: Builder(
+        builder: (_) {
+          final rows = notifications.valueOrNull ?? const [];
           if (rows.isEmpty) {
             return const Center(child: LocalizedText('Nenhum alerta ativo.'));
           }
@@ -55,8 +51,22 @@ class AlertsPage extends ConsumerWidget {
                       ? Icons.inventory_outlined
                       : Icons.notifications_outlined,
                 ),
-                title: Text(alert.title),
-                subtitle: Text(alert.body),
+                title: Text(
+                  alert.title,
+                  style: TextStyle(
+                    fontWeight: alert.readAt == null
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
+                subtitle: Text(
+                  alert.body,
+                  style: TextStyle(
+                    fontWeight: alert.readAt == null
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
                 trailing: PopupMenuButton<_NotificationAction>(
                   tooltip: 'Ações da notificação'.localized(context),
                   onSelected: (action) async {
@@ -90,14 +100,19 @@ class AlertsPage extends ConsumerWidget {
                     ),
                   ],
                 ),
-                onTap: () async =>
-                    (db.update(
-                      db.notifications,
-                    )..where((n) => n.id.equals(alert.id))).write(
-                      NotificationsCompanion(
-                        readAt: Value(DateTime.now().toUtc()),
-                      ),
-                    ),
+                onTap: () async {
+                  if (alert.readAt != null) return;
+                  final now = DateTime.now().toUtc();
+                  await (db.update(db.notifications)..where(
+                        (n) => n.id.equals(alert.id) & n.readAt.isNull(),
+                      ))
+                      .write(
+                        NotificationsCompanion(
+                          readAt: Value(now),
+                          updatedAt: Value(now),
+                        ),
+                      );
+                },
               );
             },
           );

@@ -1,7 +1,7 @@
 #define AppName "Systock"
 #define AppVersion "1.0.0"
 #define AppPublisher "Ladans"
-#define AppExeName "systock.exe"
+#define AppExeName "Systock.exe"
 
 [Setup]
 AppId={{A7A78C05-9F36-42CB-9673-18041127E552}

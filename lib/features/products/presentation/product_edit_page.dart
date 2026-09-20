@@ -89,6 +89,22 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   String? warehouseId;
   final quantity = TextEditingController();
   final price = TextEditingController();
+  final sku = TextEditingController();
+  final cost = TextEditingController();
+  final wholesale = TextEditingController();
+  final minimumPrice = TextEditingController();
+  final minimumStock = TextEditingController();
+  final maximumStock = TextEditingController();
+  bool trackStock = true, allowNegativeStock = false, active = true;
+  String _money(int value) =>
+      '${value ~/ 100},${(value % 100).toString().padLeft(2, '0')}';
+  int _parsePrice(TextEditingController controller, String label) {
+    if (!RegExp(r'^\d+([,.]\d{1,2})?$').hasMatch(controller.text.trim())) {
+      throw FormatException('Informe um valor válido para $label.');
+    }
+    return parseMoneyMinor(controller.text);
+  }
+
   bool get isKg =>
       units.where((u) => u.id == unitId).firstOrNull?.code.toUpperCase() ==
       'KG';
@@ -143,10 +159,21 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     quantity.text = formatQuantity(balances[warehouseId] ?? 0);
     price.text =
         '${loaded.saleMinor ~/ 100},${(loaded.saleMinor % 100).toString().padLeft(2, '0')}';
+    sku.text = loaded.sku ?? '';
+    cost.text = _money(loaded.costMinor);
+    wholesale.text = _money(loaded.wholesaleMinor);
+    minimumPrice.text = _money(loaded.minimumPriceMinor);
+    minimumStock.text = formatQuantity(loaded.minimumStockMilli);
+    maximumStock.text = formatQuantity(loaded.maximumStockMilli);
+    trackStock = loaded.trackStock;
+    allowNegativeStock = loaded.allowNegativeStock;
+    active = loaded.active;
     product = loaded;
     name.text = loaded.name;
     description.text = loaded.description ?? '';
-    barcode.text = primaryBarcode?.barcode ?? '';
+    barcode.text = primaryBarcode?.deletedAt == null
+        ? primaryBarcode?.barcode ?? ''
+        : '';
     location.text = loaded.location ?? '';
     shelf.text = loaded.shelf ?? '';
     categoryId = loaded.categoryId;
@@ -165,21 +192,35 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   Future<void> _save() async {
     final current = product;
     if (current == null || saving) return;
-    int saleMinor = current.saleMinor;
+    late int saleMinor, costMinor, wholesaleMinor, minimumPriceMinor;
+    late int minimumStockMilli, maximumStockMilli;
     int? targetQuantity;
     try {
-      if (isKg) {
-        if (!RegExp(r'^\d+([,.]\d{1,2})?$').hasMatch(price.text.trim())) {
-          throw const FormatException('Informe um preço por kg válido.');
+      saleMinor = _parsePrice(price, 'preço de venda');
+      costMinor = _parsePrice(cost, 'preço de custo');
+      wholesaleMinor = _parsePrice(wholesale, 'preço grossista');
+      minimumPriceMinor = _parsePrice(minimumPrice, 'preço mínimo');
+      final precision = quantityPrecision(
+        units.where((u) => u.id == unitId).firstOrNull,
+      );
+      minimumStockMilli = parseQuantityMilli(
+        minimumStock.text,
+        decimalPlaces: precision,
+      );
+      maximumStockMilli = parseQuantityMilli(
+        maximumStock.text,
+        decimalPlaces: precision,
+      );
+      if (trackStock &&
+          quantity.text != formatQuantity(balances[warehouseId] ?? 0)) {
+        final parsed = parseQuantityMilli(
+          quantity.text,
+          decimalPlaces: precision,
+        );
+        if (warehouseId == null) {
+          throw const FormatException('Cadastre um armazém ativo.');
         }
-        saleMinor = parseMoneyMinor(price.text);
-        if (current.trackStock) {
-          final parsed = parseQuantityMilli(quantity.text);
-          if (warehouseId == null) {
-            throw const FormatException('Cadastre um armazém ativo.');
-          }
-          if (parsed != (balances[warehouseId] ?? 0)) targetQuantity = parsed;
-        }
+        if (parsed != (balances[warehouseId] ?? 0)) targetQuantity = parsed;
       }
     } on FormatException catch (error) {
       await showAppError(context, error.message);
@@ -192,11 +233,11 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       current: current,
       name: name.text,
       description: description.text,
-      sku: current.sku,
+      sku: sku.text,
       categoryId: categoryId,
       brandId: brandId,
       unitId: unitId,
-      costMinor: current.costMinor,
+      costMinor: costMinor,
       saleMinor: saleMinor,
       quantityMilli: targetQuantity,
       expectedQuantityMilli: targetQuantity == null
@@ -204,15 +245,15 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
           : balances[warehouseId] ?? 0,
       warehouseId: warehouseId,
       userId: user?.id,
-      wholesaleMinor: current.wholesaleMinor,
-      minimumPriceMinor: current.minimumPriceMinor,
-      minimumStockMilli: current.minimumStockMilli,
-      maximumStockMilli: current.maximumStockMilli,
+      wholesaleMinor: wholesaleMinor,
+      minimumPriceMinor: minimumPriceMinor,
+      minimumStockMilli: minimumStockMilli,
+      maximumStockMilli: maximumStockMilli,
       location: location.text,
       shelf: shelf.text,
-      trackStock: current.trackStock,
-      allowNegativeStock: current.allowNegativeStock,
-      active: current.active,
+      trackStock: trackStock,
+      allowNegativeStock: allowNegativeStock,
+      active: active,
       barcode: barcode.text,
     );
     if (result case Success()) {
@@ -246,6 +287,12 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       shelf,
       quantity,
       price,
+      sku,
+      cost,
+      wholesale,
+      minimumPrice,
+      minimumStock,
+      maximumStock,
     ]) {
       controller.dispose();
     }
@@ -351,7 +398,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
               leading: const Icon(Icons.shield_outlined),
               title: const LocalizedText('Edição segura'),
               subtitle: const LocalizedText(
-                'Ao selecionar KG, pode definir o preço por kg e ajustar a quantidade existente com registo no histórico.',
+                'Pode editar os dados e preços do produto. Os ajustes de quantidade ficam registados no histórico.',
               ),
             ),
           ),
@@ -360,6 +407,8 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
             title: 'Informações gerais',
             children: [
               _field(name, 'Nome *'),
+              _field(sku, 'SKU'),
+              _field(barcode, 'Código de barras'),
               _field(description, 'Descrição', lines: 3),
               _dropdown(
                 'Categoria',
@@ -381,48 +430,55 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
               ),
             ],
           ),
-          if (isKg) ...[
-            const SizedBox(height: 14),
-            _Section(
-              title: 'Venda por peso',
-              children: [
-                if (product!.trackStock) ...[
-                  _dropdown(
-                    'Armazém',
-                    warehouseId,
-                    warehouses.map((w) => (w.id, w.name)).toList(),
-                    (value) => setState(() {
-                      warehouseId = value;
-                      quantity.text = formatQuantity(balances[value] ?? 0);
-                    }),
-                  ),
-                  TextField(
-                    controller: quantity,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'Quantidade existente (kg)',
-                      suffixText: 'kg',
-                      helperText:
-                          'Total disponível neste armazém. Aceita até 3 casas decimais.',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                TextField(
-                  controller: price,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  decoration: const InputDecoration(
-                    labelText: 'Preço por kg',
-                    suffixText: 'MT/kg',
-                  ),
+          const SizedBox(height: 14),
+          _Section(
+            title: 'Preços',
+            children: [
+              _numberField(price, isKg ? 'Preço por kg' : 'Preço de venda'),
+              _numberField(cost, 'Preço de custo'),
+              _numberField(wholesale, 'Preço grossista'),
+              _numberField(minimumPrice, 'Preço mínimo'),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _Section(
+            title: 'Stock e estado',
+            children: [
+              SwitchListTile(
+                title: const LocalizedText('Controlar stock'),
+                value: trackStock,
+                onChanged: (value) => setState(() => trackStock = value),
+              ),
+              SwitchListTile(
+                title: const LocalizedText('Permitir stock negativo'),
+                value: allowNegativeStock,
+                onChanged: (value) =>
+                    setState(() => allowNegativeStock = value),
+              ),
+              SwitchListTile(
+                title: const LocalizedText('Produto ativo'),
+                value: active,
+                onChanged: (value) => setState(() => active = value),
+              ),
+              _numberField(minimumStock, 'Stock mínimo'),
+              _numberField(maximumStock, 'Stock máximo'),
+              if (trackStock) ...[
+                _dropdown(
+                  'Armazém',
+                  warehouseId,
+                  warehouses.map((w) => (w.id, w.name)).toList(),
+                  (value) => setState(() {
+                    warehouseId = value;
+                    quantity.text = formatQuantity(balances[value] ?? 0);
+                  }),
+                ),
+                _numberField(
+                  quantity,
+                  isKg ? 'Quantidade existente (kg)' : 'Quantidade existente',
                 ),
               ],
-            ),
-          ],
+            ],
+          ),
           const SizedBox(height: 14),
           _Section(
             title: 'Localização',
@@ -453,6 +509,16 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       ),
     );
   }
+
+  Widget _numberField(TextEditingController controller, String label) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: TextField(
+          controller: controller,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          decoration: InputDecoration(labelText: label),
+        ),
+      );
 
   Widget _field(
     TextEditingController controller,

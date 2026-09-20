@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/notification_bell.dart';
 import 'dart:io';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
@@ -71,13 +72,13 @@ class AdaptiveShell extends ConsumerWidget {
                 body: Row(
                   children: [
                     SizedBox(
-                      width: 240,
+                      width: 270,
                       child: SafeArea(
-                        child: Column(
+                        child: _ScrollableSideMenu(
                           children: [
                             const Padding(
                               padding: EdgeInsets.all(20),
-                              child: _BrandMark(),
+                              child: _BrandMark(logoSize: 74),
                             ),
                             ListTile(
                               selected: true,
@@ -159,14 +160,7 @@ class AdaptiveShell extends ConsumerWidget {
                           children: [
                             const Expanded(child: _BrandMark()),
                             const SizedBox(width: 10),
-                            IconButton(
-                              onPressed: () => context.go('/alerts'),
-                              icon: const Icon(
-                                Icons.notifications_outlined,
-                                size: 21,
-                              ),
-                              tooltip: 'Alertas'.localized(context),
-                            ),
+                            const NotificationBell(iconSize: 21),
                             if (!stackStatus) ...[
                               const SizedBox(width: 6),
                               status,
@@ -355,11 +349,13 @@ class AdaptiveShell extends ConsumerWidget {
     body: Row(
       children: [
         NavigationRail(
+          scrollable: true,
+          leadingAtTop: false,
           selectedIndex: selectedIndex,
           labelType: NavigationRailLabelType.selected,
           leading: const Padding(
             padding: EdgeInsets.symmetric(vertical: 18),
-            child: _BrandMark(compact: true),
+            child: _BrandMark(compact: true, logoSize: 74),
           ),
           onDestinationSelected: (i) => context.go(destinations[i].path),
           destinations: [
@@ -382,7 +378,7 @@ class AdaptiveShell extends ConsumerWidget {
       body: Row(
         children: [
           Container(
-            width: mac ? 236 : 248,
+            width: mac ? 266 : 278,
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
               border: Border(
@@ -390,12 +386,11 @@ class AdaptiveShell extends ConsumerWidget {
               ),
             ),
             child: SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: _ScrollableSideMenu(
                 children: [
                   const Padding(
                     padding: EdgeInsets.fromLTRB(20, 22, 16, 24),
-                    child: _BrandMark(),
+                    child: _BrandMark(logoSize: 74),
                   ),
                   _section('VISÃO GERAL'),
                   _item(context, 0),
@@ -490,9 +485,34 @@ class AdaptiveShell extends ConsumerWidget {
   }
 }
 
+/// Keeps the footer at the bottom when there is room and scrolls the whole
+/// menu when its content exceeds the available height.
+class _ScrollableSideMenu extends StatelessWidget {
+  const _ScrollableSideMenu({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => SingleChildScrollView(
+      primary: false,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+        child: IntrinsicHeight(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: children,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class _BrandMark extends ConsumerWidget {
-  const _BrandMark({this.compact = false});
+  const _BrandMark({this.compact = false, this.logoSize = 34});
   final bool compact;
+  final double logoSize;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => StreamBuilder(
@@ -515,8 +535,8 @@ class _BrandMark extends ConsumerWidget {
         mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
         children: [
           Container(
-            width: 34,
-            height: 34,
+            width: logoSize,
+            height: logoSize,
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.primary,
               borderRadius: BorderRadius.circular(9),
@@ -524,10 +544,10 @@ class _BrandMark extends ConsumerWidget {
             clipBehavior: Clip.antiAlias,
             child: logoPath != null && File(logoPath).existsSync()
                 ? Image.file(File(logoPath), fit: BoxFit.cover)
-                : const Icon(
+                : Icon(
                     Icons.layers_rounded,
                     color: Colors.white,
-                    size: 21,
+                    size: logoSize - 13,
                   ),
           ),
           if (!compact) ...[

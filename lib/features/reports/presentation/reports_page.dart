@@ -30,9 +30,14 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
       final now = DateTime.now();
       final date =
           '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final english = Localizations.localeOf(context).languageCode == 'en';
       final uri = await picker.FilePicker.saveFile(
-        dialogTitle: 'Guardar relatório de vendas',
-        fileName: 'relatorio-vendas-$days-dias-$date.$extension',
+        dialogTitle: english
+            ? 'Save sales report'
+            : 'Guardar relatório de vendas',
+        fileName: english
+            ? 'sales-report-$days-days-$date.$extension'
+            : 'relatorio-vendas-$days-dias-$date.$extension',
         bytes: Uint8List.fromList(bytes),
         mimeType: mimeType,
       );
@@ -103,20 +108,36 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
           return const AsyncLoadingPane();
         }
         final d = snapshot.data!, c = d.company.currencyCode;
+        final locale = Localizations.localeOf(context).languageCode;
+        final text = SalesReportText(locale, c);
         String date(DateTime value) =>
             '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
         return ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                _Kpi('Receita', d.kpis.revenueMinor, c),
-                _Kpi('Custo dos produtos vendidos', d.kpis.costMinor, c),
-                _Kpi('Lucro bruto', d.kpis.grossProfitMinor, c),
-                _Kpi('Valor médio por venda', d.kpis.averageTicketMinor, c),
-              ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final columns = constraints.maxWidth >= 1000
+                    ? 4
+                    : constraints.maxWidth >= 500
+                    ? 2
+                    : 1;
+                return GridView.count(
+                  crossAxisCount: columns,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  mainAxisExtent:
+                      150 * MediaQuery.textScalerOf(context).scale(14) / 14,
+                  children: [
+                    _Kpi('Receita', d.kpis.revenueMinor, c),
+                    _Kpi('Custo dos produtos vendidos', d.kpis.costMinor, c),
+                    _Kpi('Lucro bruto', d.kpis.grossProfitMinor, c),
+                    _Kpi('Valor médio por venda', d.kpis.averageTicketMinor, c),
+                  ],
+                );
+              },
             ),
             const SizedBox(height: 12),
             LocalizedText(
@@ -131,7 +152,9 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   LocalizedText(
-                    'Vendas no período (${d.sales.length})',
+                    text.english
+                        ? 'Sales in period (${d.sales.map((r) => r.documentNumber).toSet().length})'
+                        : 'Vendas no período (${d.sales.map((r) => r.documentNumber).toSet().length})',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 12),
@@ -141,9 +164,14 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                     children: [
                       OutlinedButton.icon(
                         onPressed: () async {
-                          final csv = ReportService(
-                            ref.read(databaseProvider),
-                          ).salesCsv(d.sales, from: d.from, to: d.to);
+                          final csv = ReportService(ref.read(databaseProvider))
+                              .salesCsv(
+                                d.sales,
+                                from: d.from,
+                                to: d.to,
+                                locale: locale,
+                                currency: c,
+                              );
                           await _saveReport(
                             bytes: [0xEF, 0xBB, 0xBF, ...utf8.encode(csv)],
                             extension: 'csv',
@@ -155,9 +183,16 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                       ),
                       OutlinedButton.icon(
                         onPressed: () async {
-                          final bytes = ReportService(
-                            ref.read(databaseProvider),
-                          ).salesXlsx(d.sales, from: d.from, to: d.to);
+                          final bytes =
+                              ReportService(
+                                ref.read(databaseProvider),
+                              ).salesXlsx(
+                                d.sales,
+                                from: d.from,
+                                to: d.to,
+                                locale: locale,
+                                currency: c,
+                              );
                           await _saveReport(
                             bytes: bytes,
                             extension: 'xlsx',
@@ -175,6 +210,8 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                             d.company.tradeName,
                             d.from,
                             d.to,
+                            locale: locale,
+                            currency: c,
                           );
                           await _saveReport(
                             bytes: bytes,
@@ -195,29 +232,18 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: DataTable(
-                  columns: const [
-                    DataColumn(label: LocalizedText('Data')),
-                    DataColumn(label: LocalizedText('Documento')),
-                    DataColumn(label: LocalizedText('Estado')),
-                    DataColumn(label: LocalizedText('Total'), numeric: true),
+                  columns: [
+                    for (var i = 0; i < text.headers.length; i++)
+                      DataColumn(label: Text(text.headers[i]), numeric: i >= 4),
                   ],
                   rows: d.sales
                       .take(200)
                       .map(
-                        (r) => DataRow(
-                          cells: [
-                            DataCell(Text(date(r.createdAt.toLocal()))),
-                            DataCell(Text(r.documentNumber)),
-                            DataCell(Text(r.status)),
-                            DataCell(
-                              Text(
-                                formatMoneyMinor(
-                                  r.totalMinor,
-                                  symbol: c == 'MZN' ? 'MT' : c,
-                                ),
-                              ),
-                            ),
-                          ],
+                        (row) => DataRow(
+                          cells: text
+                              .cells(row)
+                              .map((value) => DataCell(Text(value)))
+                              .toList(),
                         ),
                       )
                       .toList(),
@@ -245,25 +271,27 @@ class _Kpi extends StatelessWidget {
   final String label, currency;
   final int minor;
   @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 230,
-    child: Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label),
-            const SizedBox(height: 8),
-            Text(
+  Widget build(BuildContext context) => Card(
+    margin: EdgeInsets.zero,
+    child: Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          LocalizedText(label),
+          const Spacer(),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
               formatMoneyMinor(
                 minor,
                 symbol: currency == 'MZN' ? 'MT' : currency,
               ),
               style: Theme.of(context).textTheme.titleLarge,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );

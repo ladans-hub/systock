@@ -100,6 +100,11 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
                       label: const LocalizedText('Ajustar'),
                     ),
                     OutlinedButton.icon(
+                      onPressed: () => context.go('/inventory/recent-entries'),
+                      icon: const Icon(Icons.history),
+                      label: const LocalizedText('Entradas recentes'),
+                    ),
+                    OutlinedButton.icon(
                       onPressed: () => context.go('/inventory/lots'),
                       icon: const Icon(Icons.event_outlined),
                       label: const LocalizedText('Lotes e validades'),

@@ -132,7 +132,7 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const ActivationContactBanner(),
+                const ActivationContactBanner(showBackground: false),
                 const SizedBox(height: 18),
                 Card(
                   margin: EdgeInsets.zero,
@@ -385,22 +385,9 @@ class _PlanCard extends StatelessWidget {
         height: 210,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: current
-              ? accent.withValues(alpha: .18)
-              : popular
-              ? accent.withValues(alpha: .10)
-              : scheme.surface,
+          color: current ? accent.withValues(alpha: .20) : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: current
-                ? accent
-                : accent.withValues(alpha: popular ? 1 : .45),
-            width: current
-                ? 3
-                : popular
-                ? 2
-                : 1,
-          ),
+          border: Border.all(color: accent, width: 1),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -420,14 +407,16 @@ class _PlanCard extends StatelessWidget {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: current ? scheme.primary : accent,
+                      color: accent,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       (current ? 'Plano atual' : 'Popular').localized(context),
                       style: TextStyle(
                         fontSize: 10,
-                        color: current ? scheme.onPrimary : Colors.black,
+                        color: accent.computeLuminance() > .179
+                            ? Colors.black
+                            : Colors.white,
                         fontWeight: FontWeight.w700,
                       ),
                     ),

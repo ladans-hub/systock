@@ -87,8 +87,8 @@ jobs:
       - name: Package Windows release
         shell: pwsh
         run: |
-          if (!(Test-Path "build/windows/x64/runner/Release/systock.exe")) {
-            throw "systock.exe não foi encontrado após a compilação Windows."
+          if (!(Test-Path "build/windows/x64/runner/Release/Systock.exe")) {
+            throw "Systock.exe não foi encontrado após a compilação Windows."
           }
           Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath "build/Systock-Windows-release.zip" -Force
       - name: Build Windows installer

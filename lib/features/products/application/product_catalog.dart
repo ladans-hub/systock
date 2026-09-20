@@ -504,7 +504,7 @@ class ProductCatalog {
                   : InventoryMovementType.adjustmentOut,
               deviceId: current.deviceId,
               userId: userId!,
-              reason: 'Quantidade em kg definida na edição do produto',
+              reason: 'Quantidade definida na edição do produto',
               allowNegative: false,
             );
             if (moved case Failure(:final error)) throw error;
@@ -600,6 +600,11 @@ class ProductCatalog {
           'minimumPriceMinor': minimumPriceMinor,
           'minimumStockMilli': minimumStockMilli,
           'maximumStockMilli': maximumStockMilli,
+          'location': clean(location),
+          'shelf': clean(shelf),
+          'trackStock': trackStock,
+          'allowNegativeStock': allowNegativeStock,
+          'active': active,
           'updatedAt': now.toIso8601String(),
         });
         await _db

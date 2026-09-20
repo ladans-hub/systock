@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/notification_bell.dart';
 import 'package:drift/drift.dart' show Variable;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
@@ -117,11 +118,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           : AppBar(
               title: const LocalizedText('Visão geral'),
               actions: [
-                IconButton(
-                  onPressed: () => context.go('/alerts'),
-                  icon: const Icon(Icons.notifications_outlined),
-                  tooltip: 'Alertas'.localized(context),
-                ),
+                const NotificationBell(),
                 const Padding(
                   padding: EdgeInsets.all(12),
                   child: Chip(

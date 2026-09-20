@@ -3,7 +3,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:systock/l10n/localized_text.dart';
 
 class ActivationContactBanner extends StatelessWidget {
-  const ActivationContactBanner({this.onContact, super.key});
+  const ActivationContactBanner({
+    this.onContact,
+    this.showBackground = true,
+    super.key,
+  });
+  final bool showBackground;
   final VoidCallback? onContact;
 
   Future<void> _openWhatsApp() async {
@@ -65,16 +70,18 @@ class ActivationContactBanner extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
+        color: showBackground ? scheme.surfaceContainerHighest : null,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: scheme.primary.withValues(alpha: .28)),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.shadow.withValues(alpha: .08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: showBackground
+            ? [
+                BoxShadow(
+                  color: scheme.shadow.withValues(alpha: .08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {

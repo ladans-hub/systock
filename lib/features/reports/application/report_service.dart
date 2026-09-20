@@ -1,3 +1,5 @@
+import 'package:systock/core/utils/money.dart';
+import 'package:systock/core/utils/quantity.dart';
 import 'package:csv/csv.dart';
 import 'package:drift/drift.dart';
 import 'package:systock/core/database/app_database.dart';
@@ -32,8 +34,12 @@ class SalesReportRow {
     this.documentNumber,
     this.createdAt,
     this.status,
-    this.totalMinor,
-  );
+    this.totalMinor, {
+    this.product = '',
+    this.quantityMilli = 0,
+  });
+  final String product;
+  final int quantityMilli;
   final String documentNumber, status;
   final DateTime createdAt;
   final int totalMinor;
@@ -223,21 +229,28 @@ class ReportService {
     DateTime from,
     DateTime to,
   ) async {
-    final rows =
-        await (_db.select(_db.sales)
-              ..where((s) => s.companyId.equals(companyId))
-              ..where((s) => s.status.isIn(['paid', 'completed']))
-              ..where((s) => s.createdAt.isBiggerOrEqualValue(from))
-              ..where((s) => s.createdAt.isSmallerThanValue(to))
-              ..orderBy([(s) => OrderingTerm.desc(s.createdAt)]))
-            .get();
+    final rows = await _db
+        .customSelect(
+          '''SELECT s.document_number, s.created_at,
+        CASE WHEN s.paid_minor >= s.total_minor THEN 'paid' ELSE 'unpaid' END payment_status,
+        si.description product, si.quantity_milli, si.total_minor
+        FROM sales s JOIN sale_items si ON si.sale_id = s.id
+        WHERE s.company_id = ? AND s.deleted_at IS NULL
+          AND s.status IN ('paid', 'completed', 'partially_paid', 'unpaid')
+          AND s.created_at >= ? AND s.created_at < ?
+        ORDER BY s.created_at DESC, s.id, si.id''',
+          variables: [Variable(companyId), Variable(from), Variable(to)],
+        )
+        .get();
     return [
       for (final row in rows)
         SalesReportRow(
-          row.documentNumber,
-          row.createdAt,
-          row.status,
-          row.totalMinor,
+          row.read('document_number'),
+          row.read('created_at'),
+          row.read('payment_status'),
+          row.read('total_minor'),
+          product: row.read('product'),
+          quantityMilli: row.read('quantity_milli'),
         ),
     ];
   }
@@ -246,47 +259,72 @@ class ReportService {
     List<SalesReportRow> rows, {
     required DateTime from,
     required DateTime to,
-  }) => Csv.excel().encode([
-    ['Período', _date(from), _date(to.subtract(const Duration(days: 1)))],
-    const [],
-    ['Data', 'Documento', 'Estado', 'Total (menor unidade)'],
-    ...rows.map(
-      (r) => [_dateTime(r.createdAt), r.documentNumber, r.status, r.totalMinor],
-    ),
-  ]);
+    String locale = 'pt',
+    String currency = 'MZN',
+  }) {
+    final text = SalesReportText(locale, currency);
+    return Csv.excel().encode([
+      [
+        text.period,
+        text.date(from),
+        text.date(to.subtract(const Duration(days: 1))),
+      ],
+      const [],
+      text.headers,
+      ...rows.map(text.cells),
+    ]);
+  }
 
   List<int> salesXlsx(
     List<SalesReportRow> rows, {
     required DateTime from,
     required DateTime to,
+    String locale = 'pt',
+    String currency = 'MZN',
   }) {
-    final excel = Excel.createExcel(), sheet = excel['Vendas'];
+    final text = SalesReportText(locale, currency);
+    final excel = Excel.createExcel(),
+        sheet = excel[text.english ? 'Sales' : 'Vendas'];
     excel.delete('Sheet1');
     sheet.appendRow([
-      TextCellValue('Período'),
-      TextCellValue(_date(from)),
-      TextCellValue(_date(to.subtract(const Duration(days: 1)))),
+      TextCellValue(text.period),
+      TextCellValue(text.date(from)),
+      TextCellValue(text.date(to.subtract(const Duration(days: 1)))),
     ]);
-    sheet.appendRow(<CellValue?>[]);
-    sheet.appendRow(
-      ['Data', 'Documento', 'Estado', 'Total'].map(TextCellValue.new).toList(),
-    );
+    sheet.appendRow([TextCellValue('')]);
+    sheet.appendRow(text.headers.map(TextCellValue.new).toList());
     for (final row in rows) {
       sheet.appendRow([
-        TextCellValue(_dateTime(row.createdAt)),
+        TextCellValue(text.dateTime(row.createdAt)),
         TextCellValue(row.documentNumber),
-        TextCellValue(row.status),
-        IntCellValue(row.totalMinor),
+        TextCellValue(row.product),
+        TextCellValue(text.status(row)),
+        DoubleCellValue(row.quantityMilli / 1000),
+        DoubleCellValue(row.totalMinor / 100),
       ]);
     }
+    for (var index = 0; index < rows.length; index++) {
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: index + 3))
+          .cellStyle = CellStyle(
+        numberFormat: NumFormat.custom(formatCode: '0.###'),
+      );
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: index + 3))
+          .cellStyle = CellStyle(
+        numberFormat: NumFormat.custom(
+          formatCode: '#,##0.00 "${currency == 'MZN' ? 'MT' : currency}"',
+        ),
+      );
+    }
+    sheet.setColumnWidth(0, 22);
+    sheet.setColumnWidth(1, 24);
+    sheet.setColumnWidth(2, 36);
+    sheet.setColumnWidth(3, 16);
+    sheet.setColumnWidth(4, 12);
+    sheet.setColumnWidth(5, 20);
     return excel.save()!;
   }
-
-  static String _date(DateTime value) =>
-      '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
-
-  static String _dateTime(DateTime value) =>
-      '${_date(value.toLocal())} ${value.toLocal().hour.toString().padLeft(2, '0')}:${value.toLocal().minute.toString().padLeft(2, '0')}';
 
   Future<List<StockReportRow>> stock(String companyId) async {
     final rows = await _db
@@ -332,4 +370,44 @@ class ReportService {
     }
     return excel.save()!;
   }
+}
+
+/// Shared labels and formatting keep the screen and all exports consistent.
+class SalesReportText {
+  const SalesReportText(this.locale, [this.currency = 'MZN']);
+  final String locale, currency;
+  bool get english => locale.startsWith('en');
+  String get title => english ? 'Sales report' : 'Relatório de vendas';
+  String get period => english ? 'Period' : 'Período';
+  String get footer => english
+      ? 'Computer processed - Systock'
+      : 'Processado por computador - Systock';
+  List<String> get headers => english
+      ? ['Date and time', 'Document', 'Product', 'Status', 'Qty.', 'Total']
+      : ['Data e Hora', 'Documento', 'Produto', 'Estado', 'Qtde.', 'Total'];
+  String status(SalesReportRow row) => row.status == 'paid'
+      ? (english ? 'Paid' : 'Pago')
+      : (english ? 'Unpaid' : 'Não pago');
+  String date(DateTime value) {
+    final local = value.toLocal();
+    return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year}';
+  }
+
+  String dateTime(DateTime value) =>
+      '${date(value)} ${value.toLocal().hour.toString().padLeft(2, '0')}:${value.toLocal().minute.toString().padLeft(2, '0')}';
+  String quantity(int milli) => english
+      ? formatQuantity(milli).replaceAll(',', '.')
+      : formatQuantity(milli);
+  List<String> cells(SalesReportRow row) => [
+    dateTime(row.createdAt),
+    row.documentNumber,
+    row.product,
+    status(row),
+    quantity(row.quantityMilli),
+    formatMoneyMinor(
+      row.totalMinor,
+      locale: locale,
+      symbol: currency == 'MZN' ? 'MT' : currency,
+    ),
+  ];
 }
