@@ -385,7 +385,7 @@ class _PlanCard extends StatelessWidget {
         height: 210,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: current ? accent.withValues(alpha: .10) : Colors.transparent,
+          color: current ? accent.withValues(alpha: .20) : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: accent, width: 1),
         ),

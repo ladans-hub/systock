@@ -95,7 +95,13 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
   final minimumPrice = TextEditingController();
   final minimumStock = TextEditingController();
   final maximumStock = TextEditingController();
-  bool trackStock = true, allowNegativeStock = false, active = true;
+  final weight = TextEditingController();
+  bool trackStock = true,
+      allowNegativeStock = false,
+      active = true,
+      trackLots = false,
+      trackSerials = false;
+  String productType = 'simple';
   String _money(int value) =>
       '${value ~/ 100},${(value % 100).toString().padLeft(2, '0')}';
   int _parsePrice(TextEditingController controller, String label) {
@@ -165,6 +171,12 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     minimumPrice.text = _money(loaded.minimumPriceMinor);
     minimumStock.text = formatQuantity(loaded.minimumStockMilli);
     maximumStock.text = formatQuantity(loaded.maximumStockMilli);
+    weight.text = loaded.weightMilli == null
+        ? ''
+        : formatQuantity(loaded.weightMilli!);
+    productType = loaded.productType;
+    trackLots = loaded.trackLots;
+    trackSerials = loaded.trackSerials;
     trackStock = loaded.trackStock;
     allowNegativeStock = loaded.allowNegativeStock;
     active = loaded.active;
@@ -194,6 +206,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     if (current == null || saving) return;
     late int saleMinor, costMinor, wholesaleMinor, minimumPriceMinor;
     late int minimumStockMilli, maximumStockMilli;
+    int? weightMilli;
     int? targetQuantity;
     try {
       saleMinor = _parsePrice(price, 'preço de venda');
@@ -211,6 +224,9 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
         maximumStock.text,
         decimalPlaces: precision,
       );
+      weightMilli = weight.text.trim().isEmpty
+          ? null
+          : parseQuantityMilli(weight.text, decimalPlaces: 3);
       if (trackStock &&
           quantity.text != formatQuantity(balances[warehouseId] ?? 0)) {
         final parsed = parseQuantityMilli(
@@ -249,6 +265,10 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       minimumPriceMinor: minimumPriceMinor,
       minimumStockMilli: minimumStockMilli,
       maximumStockMilli: maximumStockMilli,
+      productType: productType,
+      trackLots: trackLots,
+      trackSerials: trackSerials,
+      weightMilli: weightMilli,
       location: location.text,
       shelf: shelf.text,
       trackStock: trackStock,
@@ -293,6 +313,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
       minimumPrice,
       minimumStock,
       maximumStock,
+      weight,
     ]) {
       controller.dispose();
     }
@@ -428,6 +449,16 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                 units.map((e) => (e.id, '${e.code} · ${e.name}')).toList(),
                 (value) => setState(() => unitId = value),
               ),
+              _dropdown(
+                'Tipo de produto',
+                productType,
+                const [
+                  ('simple', 'Produto simples'),
+                  ('service', 'Serviço'),
+                  ('kit', 'Kit'),
+                ],
+                (value) => setState(() => productType = value ?? 'simple'),
+              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -460,6 +491,17 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
                 value: active,
                 onChanged: (value) => setState(() => active = value),
               ),
+              SwitchListTile(
+                title: const LocalizedText('Controlar lotes'),
+                value: trackLots,
+                onChanged: (value) => setState(() => trackLots = value),
+              ),
+              SwitchListTile(
+                title: const LocalizedText('Controlar números de série'),
+                value: trackSerials,
+                onChanged: (value) => setState(() => trackSerials = value),
+              ),
+              _numberField(weight, 'Peso por unidade'),
               _numberField(minimumStock, 'Stock mínimo'),
               _numberField(maximumStock, 'Stock máximo'),
               if (trackStock) ...[
