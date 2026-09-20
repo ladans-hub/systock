@@ -1,7 +1,5 @@
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:convert';
-import 'dart:typed_data';
-import 'package:file_picker/file_picker.dart' as picker;
 import 'package:flutter/material.dart';
 import 'package:systock/l10n/localized_text.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +9,9 @@ import 'package:systock/features/reports/application/report_service.dart';
 import 'package:systock/features/reports/application/report_pdf.dart';
 import 'package:systock/core/widgets/async_state_pane.dart';
 import 'package:systock/core/utils/money.dart';
+import 'package:systock/core/errors/result.dart';
+import 'package:systock/core/files/file_save_service.dart';
+import 'package:systock/core/files/selected_file_writer.dart';
 
 class ReportsPage extends ConsumerStatefulWidget {
   const ReportsPage({super.key});
@@ -31,18 +32,34 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
       final date =
           '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
       final english = Localizations.localeOf(context).languageCode == 'en';
-      final uri = await picker.FilePicker.saveFile(
+      final saved = await const FileSaveService().save(
         dialogTitle: english
             ? 'Save sales report'
             : 'Guardar relatório de vendas',
         fileName: english
             ? 'sales-report-$days-days-$date.$extension'
             : 'relatorio-vendas-$days-dias-$date.$extension',
-        bytes: Uint8List.fromList(bytes),
+        bytes: bytes,
         mimeType: mimeType,
       );
-      if (!mounted || uri == null) return;
-      final location = uri.scheme == 'file' ? uri.toFilePath() : uri.toString();
+      if (!mounted) return;
+      if (saved case Failure(:final error)) {
+        await showAppFailure(context, error);
+        return;
+      }
+      final uri = (saved as Success<Uri?>).value;
+      if (uri == null) return;
+      final location = uri.scheme == 'file'
+          ? uri.toFilePath()
+          : uri.scheme.isEmpty
+          ? uri.path
+          : uri.toString();
+      // Some desktop file-picker versions return the selected path without
+      // writing the supplied bytes. Ensure the exported document is persisted.
+      if (uri.scheme == 'file' || uri.scheme.isEmpty) {
+        await writeSelectedFile(location, bytes);
+      }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: LocalizedText('Relatório guardado em $location')),
       );

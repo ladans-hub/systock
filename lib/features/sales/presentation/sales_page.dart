@@ -9,6 +9,18 @@ import 'package:systock/core/utils/money.dart';
 
 class SalesPage extends ConsumerWidget {
   const SalesPage({super.key});
+
+  String _status(BuildContext context, String status) => switch (status) {
+    'paid' => 'Pago'.localized(context),
+    'partially_paid' => 'Parcialmente pago'.localized(context),
+    'completed' => 'Concluída'.localized(context),
+    'unpaid' => 'Não pago'.localized(context),
+    'cancelled' => 'Cancelada'.localized(context),
+    'refunded' => 'Reembolsada'.localized(context),
+    'draft' => 'Rascunho'.localized(context),
+    _ => status,
+  };
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final db = ref.watch(databaseProvider);
@@ -40,7 +52,7 @@ class SalesPage extends ConsumerWidget {
                   leading: const CircleAvatar(child: Icon(Icons.receipt_long)),
                   title: Text(sale.documentNumber),
                   subtitle: LocalizedText(
-                    '${sale.createdAt.toLocal()} • ${sale.status}',
+                    '${sale.createdAt.toLocal()} • ${_status(context, sale.status)}',
                   ),
                   trailing: Text(
                     formatMoneyMinor(sale.totalMinor),
