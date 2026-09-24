@@ -28,19 +28,16 @@ void main() {
       await tester.tap(find.text('Testar'));
       await tester.pumpAndSettle();
       expect(find.textContaining('Ficheiro em uso (32)'), findsOneWidget);
-      expect(find.byType(SelectableText), findsOneWidget);
-      final icon = tester.widget<Icon>(find.byIcon(Icons.cancel_outlined));
-      expect(icon.color, Colors.red.shade700);
+      expect(find.byType(Dialog), findsOneWidget);
+      final icon = tester.widget<Icon>(find.byIcon(Icons.close_rounded));
+      expect(icon.color, Colors.white);
       await tester.pump(const Duration(seconds: 10));
       await tester.tapAt(const Offset(5, 5));
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(Dialog), findsOneWidget);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsOneWidget);
-      await tester.tap(find.text('Close'));
-      await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.byType(Dialog), findsNothing);
     },
   );
 }

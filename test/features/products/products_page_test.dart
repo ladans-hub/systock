@@ -70,14 +70,15 @@ void main() {
       await tester.enterText(barcodeField, '12345678');
       await tester.tap(find.widgetWithText(FilledButton, 'Salvar'));
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsNWidgets(2));
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(Dialog), findsNWidgets(2));
       expect(
         find.textContaining('já pertence ao produto "Produto existente"'),
         findsOneWidget,
       );
       await tester.tap(find.text('Fechar'));
       await tester.pumpAndSettle();
-      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(find.byType(Dialog), findsOneWidget);
       expect(tester.widget<TextField>(nameField).controller!.text, 'Novo nome');
       expect(
         tester.widget<TextField>(barcodeField).controller!.text,
@@ -93,6 +94,8 @@ void main() {
       final created = products.singleWhere(
         (product) => product.name == 'Novo nome',
       );
+      await tester.tap(find.text('Fechar'));
+      await tester.pumpAndSettle();
       expect(find.text('Produto aberto: ${created.id}'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       await tester.pumpAndSettle();

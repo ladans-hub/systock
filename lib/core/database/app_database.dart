@@ -896,8 +896,18 @@ class AppDatabase extends _$AppDatabase {
         ''');
       }
       if (from < 15) {
-        await m.addColumn(saleItems, saleItems.deliveredQuantityMilli);
-        await m.addColumn(saleItems, saleItems.deliveredAt);
+        final columns = await customSelect(
+          'PRAGMA table_info(sale_items)',
+        ).get();
+        final columnNames = columns
+            .map((row) => row.read<String>('name'))
+            .toSet();
+        if (!columnNames.contains('delivered_quantity_milli')) {
+          await m.addColumn(saleItems, saleItems.deliveredQuantityMilli);
+        }
+        if (!columnNames.contains('delivered_at')) {
+          await m.addColumn(saleItems, saleItems.deliveredAt);
+        }
         await customStatement(
           'UPDATE sale_items SET delivered_quantity_milli=quantity_milli, delivered_at=(SELECT created_at FROM sales WHERE sales.id=sale_items.sale_id)',
         );
