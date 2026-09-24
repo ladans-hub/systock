@@ -158,7 +158,7 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
 
   void _message(String value) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
+    unawaited(showAppAlert(context, value));
   }
 
   @override

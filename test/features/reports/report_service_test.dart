@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:excel_community/excel_community.dart';
 import 'package:systock/features/reports/application/report_pdf.dart';
 import 'package:drift/drift.dart';
@@ -9,6 +10,7 @@ import 'package:systock/features/inventory/application/inventory_ledger.dart';
 import 'package:systock/features/onboarding/application/setup_company.dart';
 import 'package:systock/features/reports/application/report_service.dart';
 import 'package:systock/features/sales/application/complete_sale.dart';
+import 'package:systock/features/customers/application/debt_service.dart';
 
 void main() {
   test('calculates financial KPIs and exports stock CSV', () async {
@@ -138,6 +140,16 @@ void main() {
         'Loja',
         from,
         to,
+        kpis: kpi,
+        debts: const DebtSummary(
+          originalMinor: 0,
+          paidMinor: 0,
+          outstandingMinor: 0,
+          openCount: 0,
+        ),
+        watermark: File(
+          'assets/branding/systock_logo_transparent.png',
+        ).readAsBytesSync(),
         locale: locale,
       );
       expect(String.fromCharCodes(pdf.take(4)), '%PDF');
@@ -181,6 +193,66 @@ void main() {
       now.subtract(const Duration(days: 2)),
     );
     expect(outside, isEmpty);
+
+    final longPdf = await buildSalesReportPdf(
+      List.generate(
+        300,
+        (index) => SalesReportRow(
+          'VEN-${index.toString().padLeft(4, '0')}',
+          now,
+          'paid',
+          10000,
+          product: 'Produto $index',
+          quantityMilli: 1000,
+        ),
+      ),
+      'Loja',
+      from,
+      to,
+      kpis: kpi,
+      debts: const DebtSummary(
+        originalMinor: 0,
+        paidMinor: 0,
+        outstandingMinor: 0,
+        openCount: 0,
+      ),
+      watermark: File(
+        'assets/branding/systock_logo_transparent.png',
+      ).readAsBytesSync(),
+    );
+    expect(String.fromCharCodes(longPdf.take(4)), '%PDF');
+
+    final backgroundPdf = await buildSalesReportPdf(
+      List.generate(
+        643,
+        (index) => SalesReportRow(
+          'VEN-${index.toString().padLeft(4, '0')}',
+          now,
+          index.isEven ? 'paid' : 'unpaid',
+          10000,
+          product: 'Produto $index',
+          quantityMilli: 1000,
+        ),
+      ),
+      'Loja',
+      from,
+      to,
+      kpis: kpi,
+      debts: const DebtSummary(
+        originalMinor: 10000,
+        paidMinor: 5000,
+        outstandingMinor: 5000,
+        openCount: 1,
+      ),
+      locale: 'pt',
+      currency: 'MZN',
+      watermark: File(
+        'assets/branding/systock_logo_transparent.png',
+      ).readAsBytesSync(),
+    );
+    expect(String.fromCharCodes(backgroundPdf.take(4)), '%PDF');
+    expect(backgroundPdf.length, greaterThan(1000));
+
     final csv = service.stockCsv(await service.stock(company));
     expect(csv, contains('Arroz'));
     expect(csv, contains('4000'));

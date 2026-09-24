@@ -4,7 +4,7 @@ import 'package:image/image.dart' as image;
 
 void main() {
   final source = image.decodePng(
-    File('assets/branding/systock_app_icon.png').readAsBytesSync(),
+    File('assets/branding/systock_logo_transparent.png').readAsBytesSync(),
   );
   if (source == null) {
     throw StateError('Não foi possível ler o ícone principal.');

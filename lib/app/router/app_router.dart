@@ -41,6 +41,8 @@ import 'package:systock/features/inventory/presentation/lots_page.dart';
 import 'package:systock/features/purchases/presentation/purchase_detail_page.dart';
 import 'package:systock/core/security/permission_gate.dart';
 import 'package:systock/features/licensing/presentation/activation_page.dart';
+import 'package:systock/features/debts/presentation/debts_page.dart';
+import 'package:systock/features/deliveries/presentation/deliveries_page.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -187,6 +189,20 @@ final appRouter = GoRouter(
         GoRoute(
           path: '/customers',
           builder: (_, _) => const ContactsPage(ContactKind.customer),
+        ),
+        GoRoute(
+          path: '/debts',
+          builder: (_, _) => const PermissionGate(
+            permission: 'sales.create',
+            child: DebtsPage(),
+          ),
+        ),
+        GoRoute(
+          path: '/deliveries',
+          builder: (_, _) => const PermissionGate(
+            permission: 'sales.create',
+            child: DeliveriesPage(),
+          ),
         ),
         GoRoute(
           path: '/suppliers',

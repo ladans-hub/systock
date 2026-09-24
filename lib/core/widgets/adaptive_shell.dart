@@ -1,4 +1,5 @@
 import 'package:systock/core/widgets/notification_bell.dart';
+import 'package:systock/core/widgets/app_watermark.dart';
 import 'dart:io';
 
 import 'package:adaptive_platform_ui/adaptive_platform_ui.dart';
@@ -26,6 +27,17 @@ class AdaptiveShell extends ConsumerWidget {
     (label: 'Produtos', path: '/products', icon: Icons.inventory_2_outlined),
     (label: 'Stock', path: '/inventory', icon: Icons.warehouse_outlined),
     (label: 'Vendas', path: '/sales', icon: Icons.shopping_cart_outlined),
+    (
+      label: 'Gestão de entregas',
+      path: '/deliveries',
+      icon: Icons.local_shipping_outlined,
+    ),
+    (
+      label: 'Gestão de dívidas',
+      path: '/debts',
+      icon: Icons.account_balance_wallet_outlined,
+    ),
+    (label: 'Clientes', path: '/customers', icon: Icons.people_outline),
     (label: 'Cotações', path: '/quotes', icon: Icons.request_quote_outlined),
     (label: 'Relatórios', path: '/reports', icon: Icons.analytics_outlined),
     (label: 'Configurações', path: '/settings', icon: Icons.settings_outlined),
@@ -37,7 +49,7 @@ class AdaptiveShell extends ConsumerWidget {
   ];
 
   int get selectedIndex {
-    if (location.startsWith('/settings/plan')) return 8;
+    if (location.startsWith('/settings/plan')) return 11;
     final index = destinations.indexWhere((d) => location.startsWith(d.path));
     return index < 0 ? 0 : index;
   }
@@ -113,12 +125,14 @@ class AdaptiveShell extends ConsumerWidget {
       },
       child: Focus(
         autofocus: true,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            if (constraints.maxWidth < 700) return _mobile(context);
-            if (constraints.maxWidth < 1100) return _tablet(context);
-            return _desktop(context);
-          },
+        child: AppWatermark(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth < 700) return _mobile(context);
+              if (constraints.maxWidth < 1100) return _tablet(context);
+              return _desktop(context);
+            },
+          ),
         ),
       ),
     );
@@ -190,6 +204,27 @@ class AdaptiveShell extends ConsumerWidget {
             ? _showMore(context)
             : context.go(destinations[indexes[i]].path),
         selectedItemColor: Theme.of(context).colorScheme.primary,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: selected,
+          onDestinationSelected: (i) => i == 4
+              ? _showMore(context)
+              : context.go(destinations[indexes[i]].path),
+          destinations: [
+            for (final i in indexes)
+              NavigationDestination(
+                icon: Icon(destinations[i].icon),
+                selectedIcon: Icon(destinations[i].icon),
+                label: _label(context, destinations[i]),
+              ),
+            NavigationDestination(
+              icon: Icon(Icons.more_horiz),
+              selectedIcon: Icon(Icons.more_horiz),
+              label: Localizations.localeOf(context).languageCode == 'en'
+                  ? 'More'
+                  : 'Mais',
+            ),
+          ],
+        ),
         items: [
           for (final i in indexes)
             AdaptiveNavigationDestination(
@@ -398,14 +433,17 @@ class AdaptiveShell extends ConsumerWidget {
                   _item(context, 1),
                   _item(context, 4),
                   _item(context, 5),
+                  _item(context, 6),
+                  _item(context, 8),
                   _section('INVENTÁRIO'),
                   _item(context, 2),
                   _item(context, 3),
                   _section('GESTÃO'),
-                  _item(context, 6),
-                  const Spacer(),
                   _item(context, 7),
-                  _item(context, 8),
+                  _item(context, 9),
+                  const Spacer(),
+                  _item(context, 10),
+                  _item(context, 11),
                   const _UserFooter(),
                 ],
               ),
@@ -475,6 +513,9 @@ class AdaptiveShell extends ConsumerWidget {
       '/products' => l10n.products,
       '/inventory' => l10n.inventory,
       '/sales' => l10n.sales,
+      '/deliveries' => en ? 'Delivery management' : 'Gestão de entregas',
+      '/debts' => en ? 'Debt management' : 'Gestão de dívidas',
+      '/customers' => en ? 'Customers' : 'Clientes',
       '/settings' => l10n.settings,
       '/settings/plan' => en ? 'Plans' : 'Planos',
       '/pos' => en ? 'Point of sale' : 'Ponto de venda',
@@ -534,20 +575,14 @@ class _BrandMark extends ConsumerWidget {
       return Row(
         mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
         children: [
-          Container(
+          SizedBox(
             width: logoSize,
             height: logoSize,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            clipBehavior: Clip.antiAlias,
             child: logoPath != null && File(logoPath).existsSync()
-                ? Image.file(File(logoPath), fit: BoxFit.cover)
-                : Icon(
-                    Icons.layers_rounded,
-                    color: Colors.white,
-                    size: logoSize - 13,
+                ? Image.file(File(logoPath), fit: BoxFit.contain)
+                : Image.asset(
+                    'assets/branding/systock_logo_transparent.png',
+                    fit: BoxFit.contain,
                   ),
           ),
           if (!compact) ...[

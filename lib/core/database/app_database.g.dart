@@ -18325,6 +18325,28 @@ class $SaleItemsTable extends SaleItems
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _deliveredQuantityMilliMeta =
+      const VerificationMeta('deliveredQuantityMilli');
+  @override
+  late final GeneratedColumn<int> deliveredQuantityMilli = GeneratedColumn<int>(
+    'delivered_quantity_milli',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _deliveredAtMeta = const VerificationMeta(
+    'deliveredAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> deliveredAt = GeneratedColumn<DateTime>(
+    'delivered_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -18338,6 +18360,8 @@ class $SaleItemsTable extends SaleItems
     discountMinor,
     taxMinor,
     totalMinor,
+    deliveredQuantityMilli,
+    deliveredAt,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -18445,6 +18469,24 @@ class $SaleItemsTable extends SaleItems
     } else if (isInserting) {
       context.missing(_totalMinorMeta);
     }
+    if (data.containsKey('delivered_quantity_milli')) {
+      context.handle(
+        _deliveredQuantityMilliMeta,
+        deliveredQuantityMilli.isAcceptableOrUnknown(
+          data['delivered_quantity_milli']!,
+          _deliveredQuantityMilliMeta,
+        ),
+      );
+    }
+    if (data.containsKey('delivered_at')) {
+      context.handle(
+        _deliveredAtMeta,
+        deliveredAt.isAcceptableOrUnknown(
+          data['delivered_at']!,
+          _deliveredAtMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -18498,6 +18540,14 @@ class $SaleItemsTable extends SaleItems
         DriftSqlType.int,
         data['${effectivePrefix}total_minor'],
       )!,
+      deliveredQuantityMilli: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}delivered_quantity_milli'],
+      )!,
+      deliveredAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}delivered_at'],
+      ),
     );
   }
 
@@ -18519,6 +18569,8 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
   final int discountMinor;
   final int taxMinor;
   final int totalMinor;
+  final int deliveredQuantityMilli;
+  final DateTime? deliveredAt;
   const SaleItem({
     required this.id,
     required this.saleId,
@@ -18531,6 +18583,8 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
     required this.discountMinor,
     required this.taxMinor,
     required this.totalMinor,
+    required this.deliveredQuantityMilli,
+    this.deliveredAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -18548,6 +18602,10 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
     map['discount_minor'] = Variable<int>(discountMinor);
     map['tax_minor'] = Variable<int>(taxMinor);
     map['total_minor'] = Variable<int>(totalMinor);
+    map['delivered_quantity_milli'] = Variable<int>(deliveredQuantityMilli);
+    if (!nullToAbsent || deliveredAt != null) {
+      map['delivered_at'] = Variable<DateTime>(deliveredAt);
+    }
     return map;
   }
 
@@ -18566,6 +18624,10 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
       discountMinor: Value(discountMinor),
       taxMinor: Value(taxMinor),
       totalMinor: Value(totalMinor),
+      deliveredQuantityMilli: Value(deliveredQuantityMilli),
+      deliveredAt: deliveredAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(deliveredAt),
     );
   }
 
@@ -18586,6 +18648,10 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
       discountMinor: serializer.fromJson<int>(json['discountMinor']),
       taxMinor: serializer.fromJson<int>(json['taxMinor']),
       totalMinor: serializer.fromJson<int>(json['totalMinor']),
+      deliveredQuantityMilli: serializer.fromJson<int>(
+        json['deliveredQuantityMilli'],
+      ),
+      deliveredAt: serializer.fromJson<DateTime?>(json['deliveredAt']),
     );
   }
   @override
@@ -18603,6 +18669,8 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
       'discountMinor': serializer.toJson<int>(discountMinor),
       'taxMinor': serializer.toJson<int>(taxMinor),
       'totalMinor': serializer.toJson<int>(totalMinor),
+      'deliveredQuantityMilli': serializer.toJson<int>(deliveredQuantityMilli),
+      'deliveredAt': serializer.toJson<DateTime?>(deliveredAt),
     };
   }
 
@@ -18618,6 +18686,8 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
     int? discountMinor,
     int? taxMinor,
     int? totalMinor,
+    int? deliveredQuantityMilli,
+    Value<DateTime?> deliveredAt = const Value.absent(),
   }) => SaleItem(
     id: id ?? this.id,
     saleId: saleId ?? this.saleId,
@@ -18630,6 +18700,9 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
     discountMinor: discountMinor ?? this.discountMinor,
     taxMinor: taxMinor ?? this.taxMinor,
     totalMinor: totalMinor ?? this.totalMinor,
+    deliveredQuantityMilli:
+        deliveredQuantityMilli ?? this.deliveredQuantityMilli,
+    deliveredAt: deliveredAt.present ? deliveredAt.value : this.deliveredAt,
   );
   SaleItem copyWithCompanion(SaleItemsCompanion data) {
     return SaleItem(
@@ -18656,6 +18729,12 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
       totalMinor: data.totalMinor.present
           ? data.totalMinor.value
           : this.totalMinor,
+      deliveredQuantityMilli: data.deliveredQuantityMilli.present
+          ? data.deliveredQuantityMilli.value
+          : this.deliveredQuantityMilli,
+      deliveredAt: data.deliveredAt.present
+          ? data.deliveredAt.value
+          : this.deliveredAt,
     );
   }
 
@@ -18672,7 +18751,9 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
           ..write('unitCostMinor: $unitCostMinor, ')
           ..write('discountMinor: $discountMinor, ')
           ..write('taxMinor: $taxMinor, ')
-          ..write('totalMinor: $totalMinor')
+          ..write('totalMinor: $totalMinor, ')
+          ..write('deliveredQuantityMilli: $deliveredQuantityMilli, ')
+          ..write('deliveredAt: $deliveredAt')
           ..write(')'))
         .toString();
   }
@@ -18690,6 +18771,8 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
     discountMinor,
     taxMinor,
     totalMinor,
+    deliveredQuantityMilli,
+    deliveredAt,
   );
   @override
   bool operator ==(Object other) =>
@@ -18705,7 +18788,9 @@ class SaleItem extends DataClass implements Insertable<SaleItem> {
           other.unitCostMinor == this.unitCostMinor &&
           other.discountMinor == this.discountMinor &&
           other.taxMinor == this.taxMinor &&
-          other.totalMinor == this.totalMinor);
+          other.totalMinor == this.totalMinor &&
+          other.deliveredQuantityMilli == this.deliveredQuantityMilli &&
+          other.deliveredAt == this.deliveredAt);
 }
 
 class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
@@ -18720,6 +18805,8 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
   final Value<int> discountMinor;
   final Value<int> taxMinor;
   final Value<int> totalMinor;
+  final Value<int> deliveredQuantityMilli;
+  final Value<DateTime?> deliveredAt;
   final Value<int> rowid;
   const SaleItemsCompanion({
     this.id = const Value.absent(),
@@ -18733,6 +18820,8 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
     this.discountMinor = const Value.absent(),
     this.taxMinor = const Value.absent(),
     this.totalMinor = const Value.absent(),
+    this.deliveredQuantityMilli = const Value.absent(),
+    this.deliveredAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SaleItemsCompanion.insert({
@@ -18747,6 +18836,8 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
     this.discountMinor = const Value.absent(),
     this.taxMinor = const Value.absent(),
     required int totalMinor,
+    this.deliveredQuantityMilli = const Value.absent(),
+    this.deliveredAt = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        saleId = Value(saleId),
@@ -18768,6 +18859,8 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
     Expression<int>? discountMinor,
     Expression<int>? taxMinor,
     Expression<int>? totalMinor,
+    Expression<int>? deliveredQuantityMilli,
+    Expression<DateTime>? deliveredAt,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -18782,6 +18875,9 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
       if (discountMinor != null) 'discount_minor': discountMinor,
       if (taxMinor != null) 'tax_minor': taxMinor,
       if (totalMinor != null) 'total_minor': totalMinor,
+      if (deliveredQuantityMilli != null)
+        'delivered_quantity_milli': deliveredQuantityMilli,
+      if (deliveredAt != null) 'delivered_at': deliveredAt,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -18798,6 +18894,8 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
     Value<int>? discountMinor,
     Value<int>? taxMinor,
     Value<int>? totalMinor,
+    Value<int>? deliveredQuantityMilli,
+    Value<DateTime?>? deliveredAt,
     Value<int>? rowid,
   }) {
     return SaleItemsCompanion(
@@ -18812,6 +18910,9 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
       discountMinor: discountMinor ?? this.discountMinor,
       taxMinor: taxMinor ?? this.taxMinor,
       totalMinor: totalMinor ?? this.totalMinor,
+      deliveredQuantityMilli:
+          deliveredQuantityMilli ?? this.deliveredQuantityMilli,
+      deliveredAt: deliveredAt ?? this.deliveredAt,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -18852,6 +18953,14 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
     if (totalMinor.present) {
       map['total_minor'] = Variable<int>(totalMinor.value);
     }
+    if (deliveredQuantityMilli.present) {
+      map['delivered_quantity_milli'] = Variable<int>(
+        deliveredQuantityMilli.value,
+      );
+    }
+    if (deliveredAt.present) {
+      map['delivered_at'] = Variable<DateTime>(deliveredAt.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -18872,6 +18981,8 @@ class SaleItemsCompanion extends UpdateCompanion<SaleItem> {
           ..write('discountMinor: $discountMinor, ')
           ..write('taxMinor: $taxMinor, ')
           ..write('totalMinor: $totalMinor, ')
+          ..write('deliveredQuantityMilli: $deliveredQuantityMilli, ')
+          ..write('deliveredAt: $deliveredAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -57751,6 +57862,8 @@ typedef $$SaleItemsTableCreateCompanionBuilder =
       Value<int> discountMinor,
       Value<int> taxMinor,
       required int totalMinor,
+      Value<int> deliveredQuantityMilli,
+      Value<DateTime?> deliveredAt,
       Value<int> rowid,
     });
 typedef $$SaleItemsTableUpdateCompanionBuilder =
@@ -57766,6 +57879,8 @@ typedef $$SaleItemsTableUpdateCompanionBuilder =
       Value<int> discountMinor,
       Value<int> taxMinor,
       Value<int> totalMinor,
+      Value<int> deliveredQuantityMilli,
+      Value<DateTime?> deliveredAt,
       Value<int> rowid,
     });
 
@@ -57892,6 +58007,16 @@ class $$SaleItemsTableFilterComposer
 
   ColumnFilters<int> get totalMinor => $composableBuilder(
     column: $table.totalMinor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deliveredQuantityMilli => $composableBuilder(
+    column: $table.deliveredQuantityMilli,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get deliveredAt => $composableBuilder(
+    column: $table.deliveredAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -58039,6 +58164,16 @@ class $$SaleItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get deliveredQuantityMilli => $composableBuilder(
+    column: $table.deliveredQuantityMilli,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get deliveredAt => $composableBuilder(
+    column: $table.deliveredAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$SalesTableOrderingComposer get saleId {
     final $$SalesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -58151,6 +58286,16 @@ class $$SaleItemsTableAnnotationComposer
 
   GeneratedColumn<int> get totalMinor => $composableBuilder(
     column: $table.totalMinor,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deliveredQuantityMilli => $composableBuilder(
+    column: $table.deliveredQuantityMilli,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get deliveredAt => $composableBuilder(
+    column: $table.deliveredAt,
     builder: (column) => column,
   );
 
@@ -58293,6 +58438,8 @@ class $$SaleItemsTableTableManager
                 Value<int> discountMinor = const Value.absent(),
                 Value<int> taxMinor = const Value.absent(),
                 Value<int> totalMinor = const Value.absent(),
+                Value<int> deliveredQuantityMilli = const Value.absent(),
+                Value<DateTime?> deliveredAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SaleItemsCompanion(
                 id: id,
@@ -58306,6 +58453,8 @@ class $$SaleItemsTableTableManager
                 discountMinor: discountMinor,
                 taxMinor: taxMinor,
                 totalMinor: totalMinor,
+                deliveredQuantityMilli: deliveredQuantityMilli,
+                deliveredAt: deliveredAt,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -58321,6 +58470,8 @@ class $$SaleItemsTableTableManager
                 Value<int> discountMinor = const Value.absent(),
                 Value<int> taxMinor = const Value.absent(),
                 required int totalMinor,
+                Value<int> deliveredQuantityMilli = const Value.absent(),
+                Value<DateTime?> deliveredAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SaleItemsCompanion.insert(
                 id: id,
@@ -58334,6 +58485,8 @@ class $$SaleItemsTableTableManager
                 discountMinor: discountMinor,
                 taxMinor: taxMinor,
                 totalMinor: totalMinor,
+                deliveredQuantityMilli: deliveredQuantityMilli,
+                deliveredAt: deliveredAt,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

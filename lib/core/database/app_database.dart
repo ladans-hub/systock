@@ -374,6 +374,9 @@ class SaleItems extends Table {
   IntColumn get discountMinor => integer().withDefault(const Constant(0))();
   IntColumn get taxMinor => integer().withDefault(const Constant(0))();
   IntColumn get totalMinor => integer()();
+  IntColumn get deliveredQuantityMilli =>
+      integer().withDefault(const Constant(0))();
+  DateTimeColumn get deliveredAt => dateTime().nullable()();
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -747,7 +750,7 @@ class AppDatabase extends _$AppDatabase {
     ),
   );
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -891,6 +894,13 @@ class AppDatabase extends _$AppDatabase {
              )
            GROUP BY b.id
         ''');
+      }
+      if (from < 15) {
+        await m.addColumn(saleItems, saleItems.deliveredQuantityMilli);
+        await m.addColumn(saleItems, saleItems.deliveredAt);
+        await customStatement(
+          'UPDATE sale_items SET delivered_quantity_milli=quantity_milli, delivered_at=(SELECT created_at FROM sales WHERE sales.id=sale_items.sale_id)',
+        );
       }
     },
     beforeOpen: (details) async {

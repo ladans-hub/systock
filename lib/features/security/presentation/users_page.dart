@@ -25,7 +25,7 @@ class UsersPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         leading: const AdaptiveBackButton(),
-        title: const LocalizedText('Utilizadores e permissões'),
+        title: const AppBarTitle('Utilizadores e permissões'),
         actions: [
           if (full)
             TextButton.icon(
@@ -154,9 +154,7 @@ class UsersPage extends ConsumerWidget {
     if (result case Failure(:final error)) {
       showAppFailure(context, error);
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('PIN alterado com sucesso.')));
+      await showAppAlert(context, 'PIN alterado com sucesso.');
     }
   }
 
@@ -239,9 +237,7 @@ class UsersPage extends ConsumerWidget {
       return;
     }
     final message = 'Utilizador criado.';
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    await showAppAlert(context, message);
   }
 
   Future<void> _createRole(BuildContext context, AppDatabase db) async {
@@ -311,9 +307,7 @@ class UsersPage extends ConsumerWidget {
     if (result case Failure(:final error)) {
       showAppFailure(context, error);
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Perfil criado.')));
+      await showAppAlert(context, 'Perfil criado.');
     }
   }
 }

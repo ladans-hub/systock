@@ -21,7 +21,7 @@ class ExpensesPage extends ConsumerWidget {
           ..limit(200);
     return Scaffold(
       appBar: AppBar(
-        title: const LocalizedText('Despesas'),
+        title: const AppBarTitle('Despesas'),
         actions: [
           FilledButton.icon(
             onPressed: () => add(context, db),

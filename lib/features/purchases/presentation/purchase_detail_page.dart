@@ -30,7 +30,7 @@ class PurchaseDetailPage extends ConsumerWidget {
         return Scaffold(
           appBar: AppBar(
             leading: const AdaptiveBackButton(),
-            title: Text(purchase.documentNumber),
+            title: AppBarTitle(purchase.documentNumber, localized: false),
           ),
           body: ListView(
             padding: const EdgeInsets.all(20),

@@ -19,6 +19,7 @@ import 'package:systock/core/utils/money.dart';
 import 'package:systock/core/utils/quantity.dart';
 import 'package:systock/core/widgets/platform_controls.dart';
 import 'package:systock/features/products/presentation/product_image.dart';
+import 'package:uuid/uuid.dart';
 import 'package:systock/core/database/document_number_service.dart';
 import 'package:systock/core/widgets/async_state_pane.dart';
 
@@ -734,7 +735,7 @@ class _PosPageState extends ConsumerState<PosPage> {
           );
           return Scaffold(
             appBar: AppBar(
-              title: const LocalizedText('Ponto de Venda'),
+              title: const AppBarTitle('Ponto de Venda'),
               actions: [
                 IconButton(
                   onPressed: () => setState(() => gridView = false),
@@ -774,8 +775,9 @@ class _PosPageState extends ConsumerState<PosPage> {
   }
 
   Future<void> finish(AppDatabase db, Company company) async {
-    final payments = await _collectPayments();
-    if (payments == null || payments.isEmpty) return;
+    final checkout = await _collectPayments();
+    if (checkout == null || checkout.payments.isEmpty) return;
+    final payments = checkout.payments;
     final saleTotal = total;
     final changeMinor =
         payments.fold<int>(0, (sum, payment) => sum + payment.amountMinor) -
@@ -836,6 +838,8 @@ class _PosPageState extends ConsumerState<PosPage> {
         payments: payments,
         customerId: customerId,
         cashSessionId: cashSession?.id,
+        creditDueAt: checkout.creditDueAt,
+        deliverNow: checkout.deliverNow,
       );
       if (!mounted) return;
       switch (result) {
@@ -846,9 +850,7 @@ class _PosPageState extends ConsumerState<PosPage> {
           if (changeMinor > 0) {
             await _showChange(number, changeMinor, company.currencyCode);
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: LocalizedText('Venda $number concluída.')),
-            );
+            await showAppAlert(context, 'Venda $number concluída.');
           }
         case Failure(:final error):
           showAppFailure(context, error);
@@ -905,7 +907,10 @@ class _PosPageState extends ConsumerState<PosPage> {
     ),
   );
 
-  Future<List<PaymentInput>?> _collectPayments() async {
+  Future<
+    ({List<PaymentInput> payments, bool deliverNow, DateTime? creditDueAt})?
+  >
+  _collectPayments() async {
     final methods = <String, String>{
       'cash': 'Dinheiro',
       'card': 'Cartão',
@@ -925,7 +930,11 @@ class _PosPageState extends ConsumerState<PosPage> {
         ),
       ),
     ];
-    return showDialog<List<PaymentInput>>(
+    var deliverNow = true;
+    var creditDueAt = DateTime.now().add(const Duration(days: 7));
+    return showDialog<
+      ({List<PaymentInput> payments, bool deliverNow, DateTime? creditDueAt})
+    >(
       context: context,
       builder: (dialog) => StatefulBuilder(
         builder: (context, setDialogState) {
@@ -936,6 +945,9 @@ class _PosPageState extends ConsumerState<PosPage> {
               return sum;
             }
           });
+          final hasCredit = rows.any((row) => row.method == 'credit');
+          String date(DateTime value) =>
+              '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
           return AlertDialog(
             title: const LocalizedText('Pagamento'),
             content: SizedBox(
@@ -978,6 +990,8 @@ class _PosPageState extends ConsumerState<PosPage> {
                                 labelText:
                                     (rows[i].method == 'cash'
                                             ? 'Valor recebido'
+                                            : rows[i].method == 'credit'
+                                            ? 'Valor em dívida'
                                             : 'Valor')
                                         .localized(context),
                               ),
@@ -1007,7 +1021,83 @@ class _PosPageState extends ConsumerState<PosPage> {
                       label: const LocalizedText('Dividir pagamento'),
                     ),
                   ),
+                  if (hasCredit) ...[
+                    const SizedBox(height: 4),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.event_outlined),
+                      title: const LocalizedText('Vencimento da dívida'),
+                      subtitle: Text(date(creditDueAt)),
+                      trailing: const Icon(Icons.edit_calendar_outlined),
+                      onTap: () async {
+                        final selected = await showDatePicker(
+                          context: dialog,
+                          initialDate: creditDueAt,
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 3650),
+                          ),
+                        );
+                        if (selected != null) {
+                          setDialogState(() => creditDueAt = selected);
+                        }
+                      },
+                    ),
+                  ],
                   const Divider(),
+                  CheckboxListTile(
+                    value: deliverNow,
+                    contentPadding: EdgeInsets.zero,
+                    title: const LocalizedText('Entregar agora'),
+                    subtitle: const LocalizedText(
+                      'Desmarque para deixar os produtos como entrega pendente.',
+                    ),
+                    onChanged: (value) =>
+                        setDialogState(() => deliverNow = value ?? true),
+                  ),
+                  const Divider(),
+                  Row(
+                    children: [
+                      const LocalizedText('Valor recebido'),
+                      const Spacer(),
+                      Text(
+                        formatMoneyMinor(
+                          rows.where((row) => row.method != 'credit').fold<int>(
+                            0,
+                            (sum, row) {
+                              try {
+                                return sum + parseMoneyMinor(row.amount.text);
+                              } on FormatException {
+                                return sum;
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const LocalizedText('Valor em dívida'),
+                      const Spacer(),
+                      Text(
+                        formatMoneyMinor(
+                          rows.where((row) => row.method == 'credit').fold<int>(
+                            0,
+                            (sum, row) {
+                              try {
+                                return sum + parseMoneyMinor(row.amount.text);
+                              } on FormatException {
+                                return sum;
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       LocalizedText(
@@ -1049,13 +1139,23 @@ class _PosPageState extends ConsumerState<PosPage> {
                               },
                             )
                     ? () {
-                        Navigator.pop(dialog, [
-                          for (final row in rows)
-                            PaymentInput(
-                              row.method,
-                              parseMoneyMinor(row.amount.text),
-                            ),
-                        ]);
+                        Navigator.pop(dialog, (
+                          payments: [
+                            for (final row in rows)
+                              PaymentInput(
+                                row.method,
+                                parseMoneyMinor(row.amount.text),
+                              ),
+                          ],
+                          deliverNow: deliverNow,
+                          creditDueAt: hasCredit
+                              ? DateTime.utc(
+                                  creditDueAt.year,
+                                  creditDueAt.month,
+                                  creditDueAt.day,
+                                )
+                              : null,
+                        ));
                       }
                     : null,
                 child: const LocalizedText('Confirmar pagamento'),
@@ -1068,28 +1168,66 @@ class _PosPageState extends ConsumerState<PosPage> {
   }
 
   Future<String?> _selectCustomer(AppDatabase db) async {
-    final customers = await db.select(db.customers).get();
+    var customers = await (db.select(
+      db.customers,
+    )..where((customer) => customer.deletedAt.isNull())).get();
     if (!mounted) return null;
-    if (customers.isEmpty) {
-      showAppError(context, 'Cadastre um cliente antes de vender a crédito.');
-      return null;
-    }
-    var id = customers.first.id;
+    String? id = customers.firstOrNull?.id;
     return showDialog<String>(
       context: context,
       builder: (dialog) => StatefulBuilder(
         builder: (_, setState) => AlertDialog(
           title: const LocalizedText('Cliente da venda a crédito'),
-          content: DropdownButtonFormField<String>(
-            initialValue: id,
-            items: [
-              for (final customer in customers)
-                DropdownMenuItem(
-                  value: customer.id,
-                  child: Text(customer.name),
+          content: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (customers.isNotEmpty)
+                  DropdownButtonFormField<String>(
+                    initialValue: id,
+                    decoration: InputDecoration(
+                      labelText: 'Selecionar cliente existente'.localized(
+                        context,
+                      ),
+                    ),
+                    items: [
+                      for (final customer in customers)
+                        DropdownMenuItem(
+                          value: customer.id,
+                          child: Text(
+                            customer.balanceMinor > 0
+                                ? '${customer.name} · ${formatMoneyMinor(customer.balanceMinor)} em dívida'
+                                : customer.name,
+                          ),
+                        ),
+                    ],
+                    onChanged: (value) => setState(() => id = value),
+                  )
+                else
+                  const LocalizedText(
+                    'Cadastre um cliente para registrar esta dívida.',
+                  ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final created = await _createCustomer(db, dialog);
+                      if (created == null) return;
+                      customers =
+                          await (db.select(db.customers)..where(
+                                (customer) => customer.deletedAt.isNull(),
+                              ))
+                              .get();
+                      setState(() => id = created);
+                    },
+                    icon: const Icon(Icons.person_add_alt_1),
+                    label: const LocalizedText('Cadastrar novo cliente'),
+                  ),
                 ),
-            ],
-            onChanged: (value) => setState(() => id = value!),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -1097,12 +1235,67 @@ class _PosPageState extends ConsumerState<PosPage> {
               child: const LocalizedText('Cancelar'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(dialog, id),
+              onPressed: id == null ? null : () => Navigator.pop(dialog, id),
               child: const LocalizedText('Continuar'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<String?> _createCustomer(
+    AppDatabase db,
+    BuildContext dialogContext,
+  ) async {
+    final name = TextEditingController(), phone = TextEditingController();
+    final create = await showDialog<bool>(
+      context: dialogContext,
+      builder: (dialog) => AlertDialog(
+        title: const LocalizedText('Novo cliente'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: name,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Nome'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: phone,
+              decoration: const InputDecoration(labelText: 'Telefone'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const LocalizedText('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const LocalizedText('Salvar'),
+          ),
+        ],
+      ),
+    );
+    if (create != true || name.text.trim().isEmpty) return null;
+    final company = await db.select(db.companies).getSingle();
+    final id = const Uuid().v7(), now = DateTime.now().toUtc();
+    await db
+        .into(db.customers)
+        .insert(
+          CustomersCompanion.insert(
+            id: id,
+            companyId: company.id,
+            name: name.text.trim(),
+            phone: Value(phone.text.trim().isEmpty ? null : phone.text.trim()),
+            createdAt: now,
+            updatedAt: now,
+            deviceId: company.deviceId,
+          ),
+        );
+    return id;
   }
 }

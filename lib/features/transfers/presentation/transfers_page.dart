@@ -19,7 +19,7 @@ class TransfersPage extends ConsumerWidget {
           ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]);
     return Scaffold(
       appBar: AppBar(
-        title: const LocalizedText('Transferências'),
+        title: const AppBarTitle('Transferências'),
         actions: [
           FilledButton.icon(
             onPressed: () => create(context, db),

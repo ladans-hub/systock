@@ -39,6 +39,19 @@ class DriveReplicaSync {
     'devices',
     'notifications',
   };
+  static const _immutableEventTables = {
+    'purchases',
+    'purchase_items',
+    'sales',
+    'sale_items',
+    'payments',
+    'cash_movements',
+    'expenses',
+    'customer_account_movements',
+    'sale_returns',
+    'sale_return_items',
+    'inventory_movements',
+  };
   late final Map<String, TableInfo> _tables = {
     for (final table in db.allTables)
       if (!_excluded.contains(table.actualTableName))
@@ -103,6 +116,10 @@ class DriveReplicaSync {
               Map<String, dynamic>.from(change['pk'] as Map),
             );
             final local = states[table]![rowKey] as Map<String, dynamic>?;
+            if (_immutableEventTables.contains(table) &&
+                change['data'] == null) {
+              continue;
+            }
             final comparison = local == null ? 1 : _compare(change, local);
             if (comparison <= 0) continue;
             final same = local != null && _equal(local['data'], change['data']);
@@ -225,6 +242,7 @@ class DriveReplicaSync {
       for (final rowKey in states[table]!.keys.toList()) {
         final previous = states[table]![rowKey] as Map<String, dynamic>;
         if (currentKeys.contains(rowKey) || previous['data'] == null) continue;
+        if (_immutableEventTables.contains(table)) continue;
         clock = math.max(
           clock + 1,
           DateTime.now().toUtc().microsecondsSinceEpoch,

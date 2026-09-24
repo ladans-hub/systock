@@ -202,4 +202,126 @@ void main() {
       expect(alert.archivedAt, isNotNull);
     },
   );
+
+  test('updates one debt reminder every day from 7 to 1', () async {
+    final now = DateTime.now().toUtc();
+    final today = DateTime.utc(now.year, now.month, now.day);
+    await db
+        .into(db.customers)
+        .insert(
+          CustomersCompanion.insert(
+            id: 'customer',
+            companyId: 'c1',
+            name: 'Maria',
+            createdAt: now,
+            updatedAt: now,
+            deviceId: 'd1',
+          ),
+        );
+    await db
+        .into(db.warehouses)
+        .insert(
+          WarehousesCompanion.insert(
+            id: 'warehouse',
+            companyId: 'c1',
+            name: 'Principal',
+            code: 'P',
+            createdAt: now,
+            updatedAt: now,
+            deviceId: 'd1',
+          ),
+        );
+    await db
+        .into(db.roles)
+        .insert(
+          RolesCompanion.insert(
+            id: 'role',
+            companyId: 'c1',
+            name: 'Administrador',
+            createdAt: now,
+            updatedAt: now,
+            deviceId: 'd1',
+          ),
+        );
+    await db
+        .into(db.users)
+        .insert(
+          UsersCompanion.insert(
+            id: 'user',
+            companyId: 'c1',
+            roleId: 'role',
+            name: 'Admin',
+            username: 'admin-alert',
+            createdAt: now,
+            updatedAt: now,
+            deviceId: 'd1',
+          ),
+        );
+    await db
+        .into(db.sales)
+        .insert(
+          SalesCompanion.insert(
+            id: 'sale',
+            companyId: 'c1',
+            warehouseId: 'warehouse',
+            customerId: const Value('customer'),
+            documentNumber: 'VEN-1',
+            subtotalMinor: 10000,
+            totalMinor: 10000,
+            costMinor: 0,
+            createdBy: 'user',
+            createdAt: now,
+            updatedAt: now,
+            deviceId: 'd1',
+          ),
+        );
+    await db
+        .into(db.customerAccountMovements)
+        .insert(
+          CustomerAccountMovementsCompanion.insert(
+            id: 'debt',
+            companyId: 'c1',
+            customerId: 'customer',
+            saleId: const Value('sale'),
+            type: 'credit_sale',
+            amountMinor: 10000,
+            dueAt: Value(today.add(const Duration(days: 7))),
+            createdAt: now,
+            updatedAt: now,
+            deviceId: 'd1',
+          ),
+        );
+    final service = AlertService(db, now: () => today);
+    String? notificationId;
+    for (final days in [7, 6, 5, 4, 3, 2, 1]) {
+      await db
+          .update(db.customerAccountMovements)
+          .write(
+            CustomerAccountMovementsCompanion(
+              dueAt: Value(today.add(Duration(days: days))),
+            ),
+          );
+      await service.refresh('c1', 'd1');
+      final alert =
+          await (db.select(db.notifications)
+                ..where((notification) => notification.type.equals('debt_due'))
+                ..where((notification) => notification.entityId.equals('sale')))
+              .getSingle();
+      notificationId ??= alert.id;
+      expect(alert.id, notificationId);
+      expect(alert.title, 'Dívida prestes a vencer');
+      expect(
+        alert.body,
+        'Maria · VEN-1 vence em $days ${days == 1 ? 'dia' : 'dias'}.',
+      );
+      await service.refresh('c1', 'd1');
+      expect(
+        await (db.select(db.notifications)
+              ..where((notification) => notification.type.equals('debt_due'))
+              ..where((notification) => notification.entityId.equals('sale')))
+            .get(),
+        hasLength(1),
+      );
+    }
+  });
 }

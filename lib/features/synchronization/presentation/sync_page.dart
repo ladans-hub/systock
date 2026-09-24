@@ -372,7 +372,7 @@ class _SyncPageState extends ConsumerState<SyncPage>
     return Scaffold(
       appBar: AppBar(
         leading: const AdaptiveBackButton(),
-        title: const LocalizedText('Sincronização'),
+        title: const AppBarTitle('Sincronização'),
       ),
       body: StreamBuilder<List<SyncOperation>>(
         stream: query.watch(),

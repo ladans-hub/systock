@@ -74,9 +74,7 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
     if (id == null || id.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: id));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('ID do dispositivo copiado'.localized(context))),
-    );
+    await showAppAlert(context, 'ID do dispositivo copiado');
   }
 
   @override
@@ -95,14 +93,11 @@ class _ActivationPageState extends ConsumerState<ActivationPage> {
         ref.read(databaseProvider),
       ).activate(code.text);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${'Plano'.localized(context)} ${plan.label.localized(context)} '
-            '${'ativado com sucesso.'.localized(context)}',
-          ),
-        ),
+      await showAppAlert(
+        context,
+        '${'Plano'.localized(context)} ${plan.label.localized(context)} ${'ativado com sucesso.'.localized(context)}',
       );
+      if (!mounted) return;
       context.go('/');
     } on FormatException catch (e) {
       if (mounted) await showAppError(context, e.message);

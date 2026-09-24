@@ -1,11 +1,15 @@
 import 'package:drift/drift.dart';
 import 'package:systock/core/database/app_database.dart';
 import 'package:systock/core/notifications/local_notification_service.dart';
+import 'package:systock/features/customers/application/debt_service.dart';
 import 'package:uuid/uuid.dart';
 
 class AlertService {
-  AlertService(this._db) : _uuid = const Uuid();
+  AlertService(this._db, {DateTime Function()? now})
+    : _now = now ?? DateTime.now,
+      _uuid = const Uuid();
   final AppDatabase _db;
+  final DateTime Function() _now;
   final Uuid _uuid;
 
   Future<int> refresh(
@@ -25,7 +29,7 @@ class AlertService {
           readsFrom: {_db.products, _db.inventoryBalances},
         )
         .get();
-    final now = DateTime.now().toUtc();
+    final now = _now().toUtc();
     final expiryRows = await _db
         .customSelect(
           '''
@@ -57,6 +61,10 @@ class AlertService {
           },
         )
         .get();
+    final today = DateTime.utc(now.year, now.month, now.day);
+    final debts = (await DebtService(_db).debts(
+      companyId,
+    )).where((debt) => debt.balanceMinor > 0 && debt.dueAt != null).toList();
     await _db.transaction(() async {
       for (final row in rows) {
         final productId = row.read<String>('id');
@@ -207,19 +215,112 @@ class AlertService {
               ),
             );
       }
+      for (final debt in debts) {
+        final saleId = debt.saleId;
+        final dueAt = debt.dueAt!;
+        final dueDate = DateTime.utc(dueAt.year, dueAt.month, dueAt.day);
+        final days = dueDate.difference(today).inDays;
+        if (days < 1 || days > 7) continue;
+        final entityId = saleId;
+        final body =
+            '${debt.customerName} · ${debt.documentNumber} vence em $days ${days == 1 ? 'dia' : 'dias'}.';
+        final existing =
+            await (_db.select(_db.notifications)..where(
+                  (n) =>
+                      n.companyId.equals(companyId) &
+                      n.type.equals('debt_due') &
+                      n.entityId.equals(entityId),
+                ))
+                .getSingleOrNull();
+        if (existing != null) {
+          if (existing.body == body && existing.archivedAt == null) continue;
+          await (_db.update(_db.notifications)
+                ..where((notification) => notification.id.equals(existing.id)))
+              .write(
+                NotificationsCompanion(
+                  title: const Value('Dívida prestes a vencer'),
+                  body: Value(body),
+                  readAt: const Value(null),
+                  archivedAt: const Value(null),
+                  updatedAt: Value(now),
+                  version: Value(existing.version + 1),
+                ),
+              );
+          continue;
+        }
+        await _db
+            .into(_db.notifications)
+            .insert(
+              NotificationsCompanion.insert(
+                id: _uuid.v7(),
+                companyId: companyId,
+                type: 'debt_due',
+                title: 'Dívida prestes a vencer',
+                body: body,
+                entityId: Value(entityId),
+                createdAt: now,
+                updatedAt: now,
+                deviceId: deviceId,
+              ),
+            );
+      }
+      final debtAlerts =
+          await (_db.select(_db.notifications)..where(
+                (n) =>
+                    n.companyId.equals(companyId) &
+                    n.type.equals('debt_due') &
+                    n.deletedAt.isNull() &
+                    n.archivedAt.isNull(),
+              ))
+              .get();
+      for (final alert in debtAlerts) {
+        final saleId = alert.entityId;
+        final stillOpen = debts.any((debt) => debt.saleId == saleId);
+        final debt = debts.where((debt) => debt.saleId == saleId).firstOrNull;
+        if (stillOpen && debt != null) {
+          final dueAt = debt.dueAt!;
+          final dueDate = DateTime.utc(dueAt.year, dueAt.month, dueAt.day);
+          final days = dueDate.difference(today).inDays;
+          if (days >= 1 && days <= 7) continue;
+        }
+        await (_db.update(
+          _db.notifications,
+        )..where((notification) => notification.id.equals(alert.id))).write(
+          NotificationsCompanion(
+            archivedAt: Value(now),
+            readAt: Value(now),
+            updatedAt: Value(now),
+          ),
+        );
+      }
     });
-    if (notify && (rows.isNotEmpty || expiryRows.isNotEmpty)) {
+    final debtDueCount = debts.where((debt) {
+      final dueAt = debt.dueAt!;
+      final dueDate = DateTime.utc(dueAt.year, dueAt.month, dueAt.day);
+      final days = dueDate.difference(today).inDays;
+      return days >= 1 && days <= 7;
+    }).length;
+    if (notify &&
+        (rows.isNotEmpty || expiryRows.isNotEmpty || debtDueCount > 0)) {
       await LocalNotificationService.instance.show(
         id: 1001,
-        title: expiryRows.isNotEmpty
+        title: debtDueCount > 0
+            ? 'Dívidas prestes a vencer'
+            : expiryRows.isNotEmpty
             ? 'Atenção às validades'
             : 'Atenção ao stock',
-        body: expiryRows.isNotEmpty
+        body: debtDueCount > 0
+            ? '$debtDueCount dívidas precisam de atenção.'
+            : expiryRows.isNotEmpty
             ? '${expiryRows.length} lotes precisam de atenção.'
             : '${rows.length} produtos precisam de reposição.',
-        payload: expiryRows.isNotEmpty ? '/inventory/lots' : '/inventory',
+        payload: debtDueCount > 0
+            ? '/debts'
+            : expiryRows.isNotEmpty
+            ? '/inventory/lots'
+            : '/inventory',
       );
     }
-    return rows.length + expiryRows.length;
+    return rows.length + expiryRows.length + debtDueCount;
   }
 }

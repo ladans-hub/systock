@@ -12,7 +12,7 @@ class _CameraScannerPageState extends State<CameraScannerPage> {
   bool _handled = false;
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const LocalizedText('Digitalizar produto')),
+    appBar: AppBar(title: const AppBarTitle('Digitalizar produto')),
     body: MobileScanner(
       onDetect: (capture) {
         if (_handled) return;

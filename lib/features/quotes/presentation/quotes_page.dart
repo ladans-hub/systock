@@ -16,7 +16,7 @@ class QuotesPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final db = ref.watch(databaseProvider);
     return Scaffold(
-      appBar: AppBar(title: const LocalizedText('Cotações e orçamentos')),
+      appBar: AppBar(title: const AppBarTitle('Cotações e orçamentos')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _create(context, db),
         icon: const Icon(Icons.add),
@@ -196,16 +196,11 @@ class QuotesPage extends ConsumerWidget {
     if (result case Failure(:final error)) {
       showAppFailure(context, error);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(switch (result) {
-            Success() =>
-              kind == 'budget'
-                  ? 'Orçamento guardado com sucesso.'
-                  : 'Cotação guardada com sucesso.',
-            Failure(:final error) => error.userMessage,
-          }),
-        ),
+      await showAppAlert(
+        context,
+        kind == 'budget'
+            ? 'Orçamento guardado com sucesso.'
+            : 'Cotação guardada com sucesso.',
       );
     }
   }

@@ -105,7 +105,7 @@ class _MovementsPageState extends ConsumerState<MovementsPage> {
     return Scaffold(
       appBar: AppBar(
         leading: const AdaptiveBackButton(),
-        title: const LocalizedText('Movimentos de stock'),
+        title: const AppBarTitle('Movimentos de stock'),
       ),
       body: FutureBuilder(
         future: db.select(db.companies).getSingleOrNull(),

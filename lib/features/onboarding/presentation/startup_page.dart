@@ -215,9 +215,7 @@ class _StartupPageState extends ConsumerState<StartupPage> {
     if (deviceId.isEmpty) return;
     await Clipboard.setData(ClipboardData(text: deviceId));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('ID do dispositivo copiado'.localized(context))),
-    );
+    await showAppAlert(context, 'ID do dispositivo copiado');
   }
 
   Future<void> _openSession(User selected) async {
@@ -353,22 +351,6 @@ class _StartupPageState extends ConsumerState<StartupPage> {
                   child: _LoginBrand(
                     english:
                         Localizations.localeOf(context).languageCode == 'en',
-                  ),
-                ),
-              ),
-              Align(
-                alignment: Alignment.bottomRight,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 28, bottom: 16),
-                  child: Text(
-                    'by | LADANS',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      fontSize: 10,
-                      fontStyle: FontStyle.italic,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.onSurfaceVariant.withValues(alpha: .72),
-                    ),
                   ),
                 ),
               ),
@@ -582,17 +564,12 @@ class _LoginBrand extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Container(
+        SizedBox(
           width: 48,
           height: 48,
-          decoration: BoxDecoration(
-            color: scheme.primary,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(
-            Icons.layers_rounded,
-            color: Colors.white,
-            size: 27,
+          child: Image.asset(
+            'assets/branding/systock_logo_transparent.png',
+            fit: BoxFit.contain,
           ),
         ),
         const SizedBox(width: 12),

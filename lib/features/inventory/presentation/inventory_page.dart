@@ -79,7 +79,7 @@ class _InventoryPageState extends ConsumerState<InventoryPage> {
   Widget build(BuildContext context) {
     final db = ref.watch(databaseProvider);
     return Scaffold(
-      appBar: AppBar(title: const LocalizedText('Stock')),
+      appBar: AppBar(title: const AppBarTitle('Stock')),
       body: FutureBuilder(
         future: db.select(db.companies).getSingleOrNull(),
         builder: (context, company) {

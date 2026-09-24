@@ -18,7 +18,7 @@ class CategoriesPage extends ConsumerWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const LocalizedText('Categorias e marcas'),
+          title: const AppBarTitle('Categorias e marcas'),
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Categorias'),

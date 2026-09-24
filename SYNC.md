@@ -11,13 +11,22 @@ Backup é separado: snapshot SQLite consistente via `VACUUM INTO`, manifesto com
 ## Configuração OAuth do Google Drive
 
 1. No Google Cloud Console, ative a Google Drive API e configure a tela de consentimento.
-2. Crie clientes OAuth para `mz.ladans.systock` em cada plataforma. No Android, registe também os SHA-1 dos certificados debug e release.
-3. Em iOS/macOS, adicione `GIDClientID` e o URL scheme `REVERSED_CLIENT_ID` ao `Info.plist` de cada Runner. O URL scheme é obrigatório mesmo quando o client id é fornecido via Dart. No Android, forneça `GOOGLE_ANDROID_CLIENT_ID` ou configure `google-services.json` com um cliente web.
-4. O client id também pode ser injetado sem entrar no repositório:
+2. Crie clientes OAuth separados para cada plataforma. No Android, crie uma credencial do tipo **Android** com o package name `mz.ladans.systock` e o SHA-1 correspondente ao certificado usado para assinar o aplicativo:
+
+   - Debug local: `FD:C3:DD:04:10:F6:66:68:BF:93:7D:DA:EF:B5:43:78:CB:F4:C8:21`
+   - Release local: `33:E2:52:24:DE:84:63:A7:C4:82:F9:0F:F1:44:E1:35:71:00:77:94`
+   - Google Play: registe também o SHA-1 do certificado de assinatura fornecido pelo Play Console.
+
+   O package name e o SHA-1 precisam corresponder exatamente ao APK/AAB instalado. O erro Android `ApiException: 10` (`DEVELOPER_ERROR`) normalmente indica que essa associação está ausente ou incorreta. Credenciais diferentes podem ser criadas para o mesmo package name, uma para cada certificado.
+3. O Android não lê `GOOGLE_ANDROID_CLIENT_ID` no fluxo atual e não precisa de `google-services.json` para esta autenticação. O `google_sign_in` identifica o aplicativo pela credencial OAuth Android configurada no Google Cloud com package name e SHA-1. Não passe o Client ID Android como `serverClientId`; somente uma credencial OAuth do tipo **Web application** pode ser usada como `GOOGLE_SERVER_CLIENT_ID`, quando realmente necessária.
+4. Em iOS/macOS, adicione `GIDClientID` e o URL scheme `REVERSED_CLIENT_ID` ao `Info.plist` de cada Runner. O URL scheme é obrigatório mesmo quando o client id é fornecido via Dart.
+5. O client id da Apple também pode ser injetado sem entrar no repositório:
 
    `flutter run -d ios --dart-define=GOOGLE_IOS_CLIENT_ID=CLIENT_ID.apps.googleusercontent.com`
 
-   Um client id de servidor opcional usa `--dart-define=GOOGLE_SERVER_CLIENT_ID=...`.
+   Um Client ID Web opcional para autenticação de servidor usa `--dart-define=GOOGLE_SERVER_CLIENT_ID=...`.
+
+Depois de alterar credenciais Android no Google Cloud, aguarde a propagação da configuração, desinstale o aplicativo do dispositivo e instale-o novamente. Ao executar pelo VS Code, as configurações `Systock`, `Systock (profile mode)` e `Systock (release mode)` usam certificados diferentes conforme o modo selecionado; o SHA-1 correspondente deve estar registado.
 
 O app solicita somente `drive.appdata`, portanto os pacotes ficam na pasta privada do aplicativo e não aparecem entre os ficheiros normais do utilizador. O macOS já inclui acesso de rede. No Runner local, o armazenamento usa o Keychain clássico para funcionar sem uma conta de assinatura Xcode. Para distribuir uma versão assinada, habilite Keychain Sharing no target Runner e use um grupo associado à equipa Apple da aplicação.
 

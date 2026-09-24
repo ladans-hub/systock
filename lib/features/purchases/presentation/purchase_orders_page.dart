@@ -20,7 +20,7 @@ class PurchaseOrdersPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         leading: const AdaptiveBackButton(),
-        title: const LocalizedText('Pedidos de compra'),
+        title: const AppBarTitle('Pedidos de compra'),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => create(context, db),
@@ -189,9 +189,7 @@ class PurchaseOrdersPage extends ConsumerWidget {
       if (result case Failure(:final error)) {
         showAppFailure(context, error);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Pedido recebido e stock atualizado.')),
-        );
+        await showAppAlert(context, 'Pedido recebido e stock atualizado.');
       }
     }
   }

@@ -14,6 +14,8 @@ import 'package:systock/features/sales/application/reverse_sale.dart';
 import 'package:systock/features/sales/application/return_sale.dart';
 import 'package:systock/core/widgets/platform_controls.dart';
 import 'package:systock/core/database/document_number_service.dart';
+import 'package:systock/features/sales/application/sale_delivery_service.dart';
+import 'package:systock/core/utils/quantity.dart';
 
 class SaleDetailPage extends ConsumerWidget {
   const SaleDetailPage(this.saleId, {super.key});
@@ -71,7 +73,7 @@ class SaleDetailPage extends ConsumerWidget {
       return Scaffold(
         appBar: AppBar(
           leading: const AdaptiveBackButton(),
-          title: Text(v.sale.documentNumber),
+          title: AppBarTitle(v.sale.documentNumber, localized: false),
           actions: [
             IconButton(
               onPressed: () async {
@@ -163,24 +165,60 @@ class SaleDetailPage extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 20),
-            LocalizedText(
-              'Itens',
-              style: Theme.of(context).textTheme.titleLarge,
+            Row(
+              children: [
+                LocalizedText(
+                  'Itens',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const Spacer(),
+                if (v.items.any(
+                  (item) => item.deliveredQuantityMilli < item.quantityMilli,
+                ))
+                  FilledButton.icon(
+                    onPressed: () => _deliverAll(
+                      context,
+                      ref.read(databaseProvider),
+                      v.items,
+                    ),
+                    icon: const Icon(Icons.local_shipping_outlined),
+                    label: const LocalizedText('Entregar tudo'),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
             Card(
               child: Column(
-                children: v.items
-                    .map(
-                      (i) => ListTile(
-                        title: Text(i.description),
-                        subtitle: LocalizedText(
-                          '${i.quantityMilli / 1000} × ${formatMoneyMinor(i.unitPriceMinor)}',
-                        ),
-                        trailing: Text(formatMoneyMinor(i.totalMinor)),
-                      ),
-                    )
-                    .toList(),
+                children: v.items.map((i) {
+                  final pending = i.quantityMilli - i.deliveredQuantityMilli;
+                  final status = pending <= 0
+                      ? 'Entregue'
+                      : i.deliveredQuantityMilli > 0
+                      ? 'Parcialmente entregue'
+                      : 'Não entregue';
+                  return ListTile(
+                    leading: Icon(
+                      pending <= 0
+                          ? Icons.check_circle_outline
+                          : Icons.schedule_outlined,
+                    ),
+                    title: Text(i.description),
+                    subtitle: LocalizedText(
+                      '${formatQuantity(i.quantityMilli)} × ${formatMoneyMinor(i.unitPriceMinor)}\n$status · Entregue ${formatQuantity(i.deliveredQuantityMilli)} de ${formatQuantity(i.quantityMilli)}',
+                    ),
+                    isThreeLine: true,
+                    trailing: pending <= 0
+                        ? Text(formatMoneyMinor(i.totalMinor))
+                        : FilledButton.tonal(
+                            onPressed: () => _deliverItem(
+                              context,
+                              ref.read(databaseProvider),
+                              i,
+                            ),
+                            child: const LocalizedText('Entregar'),
+                          ),
+                  );
+                }).toList(),
               ),
             ),
             const SizedBox(height: 20),
@@ -207,6 +245,101 @@ class SaleDetailPage extends ConsumerWidget {
       );
     },
   );
+
+  Future<void> _deliverItem(
+    BuildContext context,
+    AppDatabase db,
+    SaleItem item,
+  ) async {
+    final pending = item.quantityMilli - item.deliveredQuantityMilli;
+    final quantity = TextEditingController(text: formatQuantity(pending));
+    final value = await showDialog<int>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const LocalizedText('Registrar entrega'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(item.description),
+            const SizedBox(height: 6),
+            LocalizedText('Pendente: ${formatQuantity(pending)}'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: quantity,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(
+                labelText: 'Quantidade entregue',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog),
+            child: const LocalizedText('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              try {
+                Navigator.pop(dialog, parseQuantityMilli(quantity.text));
+              } on FormatException {
+                return;
+              }
+            },
+            child: const LocalizedText('Registrar entrega'),
+          ),
+        ],
+      ),
+    );
+    if (value == null) return;
+    final result = await SaleDeliveryService(
+      db,
+    ).deliver(item: item, quantityMilli: value);
+    if (!context.mounted) return;
+    if (result case Failure(:final error)) {
+      showAppFailure(context, error);
+    } else {
+      context.pushReplacement('/sales/$saleId');
+    }
+  }
+
+  Future<void> _deliverAll(
+    BuildContext context,
+    AppDatabase db,
+    List<SaleItem> items,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const LocalizedText('Entregar todos os itens?'),
+        content: const LocalizedText(
+          'Todos os produtos pendentes desta venda serão marcados como entregues.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const LocalizedText('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const LocalizedText('Entregar tudo'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final result = await SaleDeliveryService(db).deliverAll(items);
+    if (!context.mounted) return;
+    if (result case Failure(:final error)) {
+      showAppFailure(context, error);
+    } else {
+      context.pushReplacement('/sales/$saleId');
+    }
+  }
 
   Future<void> _returnItem(
     BuildContext context,
@@ -286,10 +419,9 @@ class SaleDetailPage extends ConsumerWidget {
     if (result case Failure(:final error)) {
       showAppFailure(context, error);
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Devolução concluída.')));
+      await showAppAlert(context, 'Devolução concluída.');
     }
+    if (!context.mounted) return;
     if (result is Success<String>) context.go('/sales');
   }
 }

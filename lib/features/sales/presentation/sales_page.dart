@@ -28,7 +28,7 @@ class SalesPage extends ConsumerWidget {
       ..orderBy([(s) => OrderingTerm.desc(s.createdAt)])
       ..limit(100);
     return Scaffold(
-      appBar: AppBar(title: const LocalizedText('Vendas')),
+      appBar: AppBar(title: const AppBarTitle('Vendas')),
       body: StreamBuilder<List<Sale>>(
         stream: query.watch(),
         builder: (context, snapshot) {
@@ -47,17 +47,47 @@ class SalesPage extends ConsumerWidget {
             itemBuilder: (_, i) {
               final sale = snapshot.data![i];
               return Card(
-                child: ListTile(
-                  onTap: () => context.go('/sales/${sale.id}'),
-                  leading: const CircleAvatar(child: Icon(Icons.receipt_long)),
-                  title: Text(sale.documentNumber),
-                  subtitle: LocalizedText(
-                    '${sale.createdAt.toLocal()} • ${_status(context, sale.status)}',
-                  ),
-                  trailing: Text(
-                    formatMoneyMinor(sale.totalMinor),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
+                child: FutureBuilder<List<SaleItem>>(
+                  future: (db.select(
+                    db.saleItems,
+                  )..where((item) => item.saleId.equals(sale.id))).get(),
+                  builder: (context, itemsSnapshot) {
+                    final items = itemsSnapshot.data ?? const <SaleItem>[];
+                    final pending = items.fold<int>(
+                      0,
+                      (sum, item) =>
+                          sum +
+                          item.quantityMilli -
+                          item.deliveredQuantityMilli,
+                    );
+                    final delivered = items.fold<int>(
+                      0,
+                      (sum, item) => sum + item.deliveredQuantityMilli,
+                    );
+                    final delivery = pending <= 0
+                        ? 'Entregue'
+                        : delivered > 0
+                        ? 'Parcialmente entregue'
+                        : 'Entrega pendente';
+                    return ListTile(
+                      onTap: () => context.go('/sales/${sale.id}'),
+                      leading: CircleAvatar(
+                        child: Icon(
+                          pending <= 0
+                              ? Icons.inventory_2_outlined
+                              : Icons.schedule_outlined,
+                        ),
+                      ),
+                      title: Text(sale.documentNumber),
+                      subtitle: LocalizedText(
+                        '${sale.createdAt.toLocal()} • ${_status(context, sale.status)} • $delivery',
+                      ),
+                      trailing: Text(
+                        formatMoneyMinor(sale.totalMinor),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    );
+                  },
                 ),
               );
             },

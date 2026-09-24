@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -98,14 +99,13 @@ class _ProductImportPageState extends ConsumerState<ProductImportPage> {
     }
   }
 
-  void _message(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _message(String text) => unawaited(showAppAlert(context, text));
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       leading: const AdaptiveBackButton(),
-      title: const LocalizedText('Importar produtos'),
+      title: const AppBarTitle('Importar produtos'),
     ),
     body: ListView(
       padding: const EdgeInsets.all(20),

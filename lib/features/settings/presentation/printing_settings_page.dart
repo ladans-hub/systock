@@ -42,9 +42,7 @@ class _PrintingSettingsPageState extends ConsumerState<PrintingSettingsPage> {
           mode: InsertMode.insertOrReplace,
         );
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: LocalizedText('Perfil de impressão salvo.')),
-      );
+      await showAppAlert(context, 'Perfil de impressão salvo.');
     }
   }
 
@@ -83,22 +81,14 @@ class _PrintingSettingsPageState extends ConsumerState<PrintingSettingsPage> {
       await showAppError(context, result.message);
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          result is PrintSuccess
-              ? 'Página de teste enviada.'
-              : (result as PrintFailure).message,
-        ),
-      ),
-    );
+    await showAppAlert(context, 'Página de teste enviada.');
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       leading: const AdaptiveBackButton(),
-      title: const LocalizedText('Impressão e recibos'),
+      title: const AppBarTitle('Impressão e recibos'),
     ),
     body: ListView(
       padding: const EdgeInsets.all(20),

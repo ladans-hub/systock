@@ -102,6 +102,7 @@ void main() {
         ),
       ],
       payments: const [PaymentInput('credit', 10000)],
+      creditDueAt: now.add(const Duration(days: 7)),
     );
     expect(creditResult, isA<Success<String>>());
     expect(
@@ -111,6 +112,11 @@ void main() {
       10000,
     );
     expect(await db.select(db.customerAccountMovements).get(), hasLength(1));
+    final movement = await db.select(db.customerAccountMovements).getSingle();
+    expect(
+      movement.dueAt?.millisecondsSinceEpoch,
+      closeTo(now.add(const Duration(days: 7)).millisecondsSinceEpoch, 1000),
+    );
   });
   test('insufficient stock rolls back sale and payments', () async {
     final db = AppDatabase(NativeDatabase.memory());

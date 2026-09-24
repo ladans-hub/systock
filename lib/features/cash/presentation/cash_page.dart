@@ -16,7 +16,7 @@ class CashPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final db = ref.watch(databaseProvider);
     return Scaffold(
-      appBar: AppBar(title: const LocalizedText('Controle de caixa')),
+      appBar: AppBar(title: const AppBarTitle('Controle de caixa')),
       body: FutureBuilder(
         future: load(db),
         builder: (context, s) {
@@ -199,12 +199,9 @@ class CashPage extends ConsumerWidget {
         );
     if (!context.mounted) return;
     if (result case Success(:final value)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: LocalizedText(
-            'Caixa fechado. Diferença: ${formatMoneyMinor(value)}',
-          ),
-        ),
+      await showAppAlert(
+        context,
+        'Caixa fechado. Diferença: ${formatMoneyMinor(value)}',
       );
       (context as Element).markNeedsBuild();
     } else if (result case Failure(:final error)) {

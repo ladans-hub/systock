@@ -24,7 +24,7 @@ class _LabelsPageState extends ConsumerState<LabelsPage> {
     return Scaffold(
       appBar: AppBar(
         leading: const AdaptiveBackButton(),
-        title: const LocalizedText('Etiquetas de produtos'),
+        title: const AppBarTitle('Etiquetas de produtos'),
       ),
       body: FutureBuilder(
         future: db.select(db.products).get(),

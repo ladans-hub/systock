@@ -23,7 +23,7 @@ class PurchasesPage extends ConsumerWidget {
           ..limit(100);
     return Scaffold(
       appBar: AppBar(
-        title: const LocalizedText('Compras'),
+        title: const AppBarTitle('Compras'),
         actions: [
           TextButton.icon(
             onPressed: () => context.go('/purchases/orders'),

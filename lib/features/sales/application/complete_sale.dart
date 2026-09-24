@@ -51,6 +51,7 @@ class CompleteSale {
     String? cashSessionId,
     DateTime? creditDueAt,
     int globalDiscountMinor = 0,
+    bool deliverNow = true,
   }) async {
     if (lines.isEmpty ||
         lines.any((l) => l.quantityMilli <= 0 || l.unitPriceMinor < 0)) {
@@ -74,10 +75,10 @@ class CompleteSale {
     if (total < 0 ||
         allocated < total ||
         change > cashReceived ||
-        (credit > 0 && customerId == null)) {
+        (credit > 0 && (customerId == null || creditDueAt == null))) {
       return const Failure(
         ValidationFailure(
-          'O pagamento deve cobrir o total; troco só pode ser devolvido em dinheiro e vendas a crédito exigem cliente.',
+          'O pagamento deve cobrir o total; troco só pode ser devolvido em dinheiro e vendas a crédito exigem cliente e data de vencimento.',
         ),
       );
     }
@@ -123,6 +124,10 @@ class CompleteSale {
                   discountMinor: Value(line.discountMinor),
                   taxMinor: Value(line.taxMinor),
                   totalMinor: line.totalMinor,
+                  deliveredQuantityMilli: Value(
+                    deliverNow ? line.quantityMilli : 0,
+                  ),
+                  deliveredAt: Value(deliverNow ? now : null),
                 ),
               );
           final product = await (_db.select(
@@ -227,6 +232,7 @@ class CompleteSale {
           'totalMinor': total,
           'costMinor': cost,
           'paidMinor': paid,
+          'deliveryStatus': deliverNow ? 'delivered' : 'pending',
           'changeMinor': change,
           'createdBy': userId,
           'createdAt': now.toIso8601String(),
@@ -242,6 +248,7 @@ class CompleteSale {
                 'discountMinor': line.discountMinor,
                 'taxMinor': line.taxMinor,
                 'totalMinor': line.totalMinor,
+                'deliveredQuantityMilli': deliverNow ? line.quantityMilli : 0,
               },
           ],
           'payments': [

@@ -100,7 +100,7 @@ class _BusinessRulesPageState extends ConsumerState<BusinessRulesPage> {
     return Scaffold(
       appBar: AppBar(
         leading: const AdaptiveBackButton(),
-        title: const LocalizedText('Stock, preços e impostos'),
+        title: const AppBarTitle('Stock, preços e impostos'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),

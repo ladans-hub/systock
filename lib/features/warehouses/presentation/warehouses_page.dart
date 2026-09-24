@@ -14,7 +14,7 @@ class WarehousesPage extends ConsumerWidget {
     final db = ref.watch(databaseProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const LocalizedText('Armazéns'),
+        title: const AppBarTitle('Armazéns'),
         actions: [
           FilledButton.icon(
             onPressed: () => add(context, db),

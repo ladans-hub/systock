@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -196,8 +197,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     await AppRestartScope.restart(context);
   }
 
-  void _message(String text) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  void _message(String text) => unawaited(showAppAlert(context, text));
 
   @override
   Widget build(BuildContext context) {
@@ -208,7 +208,7 @@ class _BackupPageState extends ConsumerState<BackupPage> {
     return Scaffold(
       appBar: AppBar(
         leading: const AdaptiveBackButton(),
-        title: const LocalizedText('Backup e restauração'),
+        title: const AppBarTitle('Backup e restauração'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(20),

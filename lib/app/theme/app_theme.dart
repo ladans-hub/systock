@@ -65,10 +65,24 @@ abstract final class AppTheme {
         elevation: 0,
         height: 68,
         backgroundColor: dark ? const Color(0xFF0D1821) : Colors.white,
-        indicatorColor: palette.primary.withValues(alpha: .18),
-        labelTextStyle: const WidgetStatePropertyAll(
-          TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-        ),
+        indicatorColor: palette.primary,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return const IconThemeData(color: Colors.white);
+          }
+          return IconThemeData(color: scheme.onSurfaceVariant);
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          return TextStyle(
+            color: states.contains(WidgetState.selected)
+                ? scheme.onSurface
+                : scheme.onSurfaceVariant,
+            fontSize: 11,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w700
+                : FontWeight.w600,
+          );
+        }),
       ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: dark ? const Color(0xFF0D1821) : Colors.white,

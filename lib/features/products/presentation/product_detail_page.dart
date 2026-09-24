@@ -118,7 +118,7 @@ class ProductDetailPage extends ConsumerWidget {
         child: Scaffold(
           appBar: AppBar(
             leading: const AdaptiveBackButton(),
-            title: Text(d.product.name),
+            title: AppBarTitle(d.product.name, localized: false),
             actions: [
               IconButton(
                 onPressed: () => context.go('/products/${d.product.id}/edit'),
@@ -312,9 +312,7 @@ class ProductDetailPage extends ConsumerWidget {
     if (result case Failure(:final error)) {
       showAppFailure(context, error);
     } else {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Imagem adicionada.')));
+      await showAppAlert(context, 'Imagem adicionada.');
     }
   }
 
@@ -499,10 +497,9 @@ class _ProductStockTab extends StatelessWidget {
     if (result case Failure(:final error)) {
       showAppFailure(context, error);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Quantidade atualizada com movimento de ajuste.'),
-        ),
+      await showAppAlert(
+        context,
+        'Quantidade atualizada com movimento de ajuste.',
       );
     }
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:systock/core/widgets/action_colors.dart';
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' hide Column;
@@ -56,7 +57,7 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
         return Scaffold(
           appBar: AppBar(
             leading: const AdaptiveBackButton(fallbackPath: '/quotes'),
-            title: Text(data.quote.documentNumber),
+            title: AppBarTitle(data.quote.documentNumber, localized: false),
             actions: [
               IconButton(
                 tooltip: 'Editar'.localized(context),
@@ -267,9 +268,7 @@ class _QuoteDetailPageState extends ConsumerState<QuoteDetailPage> {
     }
   }
 
-  void _message(String message) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(message)));
+  void _message(String message) => unawaited(showAppAlert(context, message));
 }
 
 class _Info extends StatelessWidget {

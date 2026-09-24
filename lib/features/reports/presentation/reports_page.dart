@@ -12,6 +12,9 @@ import 'package:systock/core/utils/money.dart';
 import 'package:systock/core/errors/result.dart';
 import 'package:systock/core/files/file_save_service.dart';
 import 'package:systock/core/files/selected_file_writer.dart';
+import 'package:systock/features/customers/application/debt_service.dart';
+import 'dart:io';
+import 'package:flutter/services.dart';
 
 class ReportsPage extends ConsumerStatefulWidget {
   const ReportsPage({super.key});
@@ -21,6 +24,51 @@ class ReportsPage extends ConsumerStatefulWidget {
 
 class _ReportsPageState extends ConsumerState<ReportsPage> {
   int days = 30;
+  bool generatingPdf = false;
+
+  Future<void> _exportPdf({
+    required List<SalesReportRow> rows,
+    required Company company,
+    required DateTime from,
+    required DateTime to,
+    required SalesKpis kpis,
+    required DebtSummary debts,
+    required String locale,
+    required String currency,
+  }) async {
+    if (generatingPdf) return;
+    setState(() => generatingPdf = true);
+    try {
+      final watermark = await _watermarkBytes(company.logoPath);
+      await WidgetsBinding.instance.endOfFrame;
+      final bytes = await buildSalesReportPdf(
+        rows,
+        company.tradeName,
+        from,
+        to,
+        kpis: kpis,
+        debts: debts,
+        locale: locale,
+        currency: currency,
+        watermark: watermark,
+      );
+      if (!mounted) return;
+      await _saveReport(
+        bytes: bytes,
+        extension: 'pdf',
+        mimeType: 'application/pdf',
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Falha ao gerar relatório PDF: $error\n$stackTrace');
+      if (!mounted) return;
+      await showAppError(
+        context,
+        'Não foi possível gerar o relatório PDF. Tente novamente.',
+      );
+    } finally {
+      if (mounted) setState(() => generatingPdf = false);
+    }
+  }
 
   Future<void> _saveReport({
     required List<int> bytes,
@@ -60,9 +108,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
         await writeSelectedFile(location, bytes);
       }
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: LocalizedText('Relatório guardado em $location')),
-      );
+      await showAppAlert(context, 'Relatório guardado em $location');
     } catch (error, stackTrace) {
       debugPrint('Falha ao guardar relatório: $error\n$stackTrace');
       if (!mounted) return;
@@ -78,6 +124,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
       List<SalesReportRow> sales,
       DateTime from,
       DateTime to,
+      DebtSummary debts,
     })
   >
   load(AppDatabase db) async {
@@ -94,20 +141,23 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
       sales: await service.sales(company.id, from, to),
       from: from,
       to: to,
+      debts: await DebtService(db).summary(company.id),
     );
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const LocalizedText('Relatórios'),
+      title: const AppBarTitle('Relatórios'),
       actions: [
         DropdownButton<int>(
           value: days,
-          items: const [7, 30, 90, 180, 365]
+          items: const [1, 7, 30, 90, 180, 365]
               .map(
-                (d) =>
-                    DropdownMenuItem(value: d, child: LocalizedText('$d dias')),
+                (d) => DropdownMenuItem(
+                  value: d,
+                  child: LocalizedText(d == 1 ? 'Hoje' : '$d dias'),
+                ),
               )
               .toList(),
           onChanged: (v) => setState(() => days = v!),
@@ -152,6 +202,8 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                     _Kpi('Custo dos produtos vendidos', d.kpis.costMinor, c),
                     _Kpi('Lucro bruto', d.kpis.grossProfitMinor, c),
                     _Kpi('Valor médio por venda', d.kpis.averageTicketMinor, c),
+                    _Kpi('Valor liquidado', d.debts.paidMinor, c),
+                    _Kpi('Saldo a receber', d.debts.outstandingMinor, c),
                   ],
                 );
               },
@@ -221,23 +273,29 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                         label: const LocalizedText('XLSX'),
                       ),
                       OutlinedButton.icon(
-                        onPressed: () async {
-                          final bytes = await buildSalesReportPdf(
-                            d.sales,
-                            d.company.tradeName,
-                            d.from,
-                            d.to,
-                            locale: locale,
-                            currency: c,
-                          );
-                          await _saveReport(
-                            bytes: bytes,
-                            extension: 'pdf',
-                            mimeType: 'application/pdf',
-                          );
-                        },
-                        icon: const Icon(Icons.picture_as_pdf),
-                        label: const LocalizedText('PDF'),
+                        onPressed: generatingPdf
+                            ? null
+                            : () => _exportPdf(
+                                rows: d.sales,
+                                company: d.company,
+                                from: d.from,
+                                to: d.to,
+                                kpis: d.kpis,
+                                debts: d.debts,
+                                locale: locale,
+                                currency: c,
+                              ),
+                        icon: generatingPdf
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.picture_as_pdf),
+                        label: LocalizedText(
+                          generatingPdf ? 'A gerar PDF...' : 'PDF',
+                        ),
                       ),
                     ],
                   ),
@@ -281,6 +339,17 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
       },
     ),
   );
+
+  Future<Uint8List> _watermarkBytes(String? path) async {
+    if (path != null) {
+      final file = File(path);
+      if (await file.exists()) return file.readAsBytes();
+    }
+    final data = await rootBundle.load(
+      'assets/branding/systock_logo_transparent.png',
+    );
+    return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+  }
 }
 
 class _Kpi extends StatelessWidget {

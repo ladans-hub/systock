@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:drift/drift.dart' show InsertMode;
 import 'package:systock/l10n/localized_text.dart';
@@ -14,7 +15,9 @@ class SettingsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final en = Localizations.localeOf(context).languageCode == 'en';
     return Scaffold(
-      appBar: AppBar(title: Text(en ? 'Settings' : 'Configurações')),
+      appBar: AppBar(
+        title: AppBarTitle(en ? 'Settings' : 'Configurações', localized: false),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -174,12 +177,9 @@ class SettingsPage extends ConsumerWidget {
                     final company = await db.select(db.companies).getSingle();
                     await DemoDataSeeder(db).seed(company, refresh: true);
                     if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: LocalizedText(
-                          'Dados de demonstração prontos.',
-                        ),
-                      ),
+                    await showAppAlert(
+                      context,
+                      'Dados de demonstração prontos.',
                     );
                   },
                 ),

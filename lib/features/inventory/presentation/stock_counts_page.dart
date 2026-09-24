@@ -22,7 +22,7 @@ class StockCountsPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         leading: const AdaptiveBackButton(),
-        title: const LocalizedText('Inventário físico'),
+        title: const AppBarTitle('Inventário físico'),
         actions: [
           FilledButton.icon(
             onPressed: () => create(context, db),

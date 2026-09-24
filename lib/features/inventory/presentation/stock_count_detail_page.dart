@@ -51,7 +51,7 @@ class StockCountDetailPage extends ConsumerWidget {
         return Scaffold(
           appBar: AppBar(
             leading: const AdaptiveBackButton(),
-            title: Text(data.count.documentNumber),
+            title: AppBarTitle(data.count.documentNumber, localized: false),
             actions: [
               if (data.count.status == 'draft')
                 FilledButton.icon(

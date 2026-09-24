@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:systock/core/widgets/action_colors.dart';
 import 'package:systock/core/widgets/error_dialog.dart';
 import 'package:drift/drift.dart' show OrderingTerm, Variable;
@@ -42,7 +43,7 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
         return Scaffold(
           appBar: AppBar(
             leading: const AdaptiveBackButton(fallbackPath: '/inventory'),
-            title: Text(product.name),
+            title: AppBarTitle(product.name, localized: false),
           ),
           body: ListView(
             padding: const EdgeInsets.all(20),
@@ -414,9 +415,7 @@ class _InventoryProductPageState extends ConsumerState<InventoryProductPage> {
     }
   }
 
-  void _message(String value) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(value)));
+  void _message(String value) => unawaited(showAppAlert(context, value));
 
   String _quantity(int milli) {
     final value = milli / 1000;

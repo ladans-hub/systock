@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
@@ -101,9 +102,7 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
         );
     if (!mounted) return;
     setState(() => saving = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: LocalizedText('Dados da empresa atualizados.')),
-    );
+    await showAppAlert(context, 'Dados da empresa atualizados.');
   }
 
   @override
@@ -112,7 +111,7 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
     return Scaffold(
       appBar: AppBar(
         leading: const AdaptiveBackButton(),
-        title: const LocalizedText('Empresa'),
+        title: const AppBarTitle('Empresa'),
       ),
       body: FutureBuilder<Company>(
         future: db.select(db.companies).getSingle(),
@@ -153,7 +152,10 @@ class _CompanySettingsPageState extends ConsumerState<CompanySettingsPage> {
                                   Icons.add_photo_alternate_outlined,
                                   size: 38,
                                 )
-                              : Image.file(File(logoPath!), fit: BoxFit.cover),
+                              : Image.file(
+                                  File(logoPath!),
+                                  fit: BoxFit.contain,
+                                ),
                         ),
                       ),
                       const SizedBox(height: 8),

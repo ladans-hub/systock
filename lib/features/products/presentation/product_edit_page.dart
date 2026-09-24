@@ -329,7 +329,7 @@ class _ProductEditPageState extends ConsumerState<ProductEditPage> {
     return Scaffold(
       appBar: AppBar(
         leading: const AdaptiveBackButton(),
-        title: const LocalizedText('Editar produto'),
+        title: const AppBarTitle('Editar produto'),
       ),
       bottomNavigationBar: SafeArea(
         top: false,

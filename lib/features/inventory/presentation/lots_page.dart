@@ -15,7 +15,7 @@ class LotsPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         leading: const AdaptiveBackButton(),
-        title: const LocalizedText('Lotes e validades'),
+        title: const AppBarTitle('Lotes e validades'),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => add(context, db),

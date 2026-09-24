@@ -21,7 +21,7 @@ class ContactsPage extends ConsumerWidget {
         customers = kind == ContactKind.customer;
     return Scaffold(
       appBar: AppBar(
-        title: Text(customers ? 'Clientes' : 'Fornecedores'),
+        title: AppBarTitle(customers ? 'Clientes' : 'Fornecedores'),
         actions: [
           IconButton(
             onPressed: () => add(context, db),
@@ -69,18 +69,174 @@ class ContactsPage extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       itemCount: rows.length,
       separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (_, i) => Card(
-        child: ListTile(
-          onTap: customers == null || db == null
-              ? null
-              : () => _customerDetails(context, db, customers[i]),
-          leading: const CircleAvatar(child: Icon(Icons.person_outline)),
-          title: Text(rows[i].$1),
-          subtitle: Text(rows[i].$2 ?? 'Sem telefone'),
-          trailing: Text(formatMoneyMinor(rows[i].$3)),
+      itemBuilder: (_, i) {
+        final customer = customers?[i];
+        return Card(
+          child: ListTile(
+            onTap: customer == null || db == null
+                ? null
+                : () => _customerDetails(context, db, customer),
+            leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+            title: Text(rows[i].$1),
+            subtitle: Text(rows[i].$2 ?? 'Sem telefone'),
+            trailing: customer == null || db == null
+                ? Text(formatMoneyMinor(rows[i].$3))
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(formatMoneyMinor(rows[i].$3)),
+                      PopupMenuButton<String>(
+                        tooltip: 'Ações'.localized(context),
+                        onSelected: (action) async {
+                          switch (action) {
+                            case 'view':
+                              await _customerDetails(context, db, customer);
+                            case 'edit':
+                              await _editCustomer(context, db, customer);
+                            case 'remove':
+                              await _removeCustomer(context, db, customer);
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: 'view',
+                            child: ListTile(
+                              leading: Icon(Icons.visibility_outlined),
+                              title: LocalizedText('Ver'),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: ListTile(
+                              leading: Icon(Icons.edit_outlined),
+                              title: LocalizedText('Editar'),
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'remove',
+                            child: ListTile(
+                              leading: Icon(Icons.delete_outline),
+                              title: LocalizedText('Remover'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _editCustomer(
+    BuildContext context,
+    AppDatabase db,
+    Customer customer,
+  ) async {
+    final name = TextEditingController(text: customer.name);
+    final phone = TextEditingController(text: customer.phone);
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const LocalizedText('Editar cliente'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: name,
+              autofocus: true,
+              decoration: InputDecoration(labelText: 'Nome'.localized(context)),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: phone,
+              decoration: InputDecoration(
+                labelText: 'Telefone'.localized(context),
+              ),
+            ),
+          ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const LocalizedText('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const LocalizedText('Salvar'),
+          ),
+        ],
       ),
     );
+    if (save != true || !context.mounted) return;
+    if (name.text.trim().isEmpty) {
+      await showAppAlert(
+        context,
+        'Informe o nome do cliente.',
+        kind: AppAlertKind.error,
+      );
+      return;
+    }
+    await (db.update(
+      db.customers,
+    )..where((c) => c.id.equals(customer.id))).write(
+      CustomersCompanion(
+        name: Value(name.text.trim()),
+        phone: Value(phone.text.trim().isEmpty ? null : phone.text.trim()),
+        updatedAt: Value(DateTime.now().toUtc()),
+        version: Value(customer.version + 1),
+      ),
+    );
+    if (!context.mounted) return;
+    await showAppAlert(context, 'Cliente atualizado.');
+  }
+
+  Future<void> _removeCustomer(
+    BuildContext context,
+    AppDatabase db,
+    Customer customer,
+  ) async {
+    if (customer.balanceMinor > 0) {
+      await showAppAlert(
+        context,
+        'Este cliente possui uma dívida pendente e não pode ser removido.',
+        kind: AppAlertKind.error,
+      );
+      return;
+    }
+    final remove = await showDialog<bool>(
+      context: context,
+      builder: (dialog) => AlertDialog(
+        title: const LocalizedText('Remover cliente'),
+        content: LocalizedText(
+          'Deseja remover ${customer.name}? O histórico de vendas será preservado.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialog, false),
+            child: const LocalizedText('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialog, true),
+            child: const LocalizedText('Remover'),
+          ),
+        ],
+      ),
+    );
+    if (remove != true) return;
+    final now = DateTime.now().toUtc();
+    await (db.update(
+      db.customers,
+    )..where((c) => c.id.equals(customer.id))).write(
+      CustomersCompanion(
+        deletedAt: Value(now),
+        updatedAt: Value(now),
+        version: Value(customer.version + 1),
+      ),
+    );
+    if (!context.mounted) return;
+    await showAppAlert(context, 'Cliente removido.');
   }
 
   Future<void> _customerDetails(
@@ -154,9 +310,7 @@ class ContactsPage extends ConsumerWidget {
                     if (result case Failure(:final error)) {
                       showAppFailure(context, error);
                     } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Pagamento registrado.')),
-                      );
+                      await showAppAlert(context, 'Pagamento registrado.');
                     }
                   },
             child: const LocalizedText('Registrar'),

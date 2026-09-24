@@ -145,7 +145,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
     final db = ref.watch(databaseProvider);
     return Scaffold(
       appBar: AppBar(
-        title: const LocalizedText('Produtos'),
+        title: const AppBarTitle('Produtos'),
         actions: [
           IconButton(
             onPressed: () => setState(() => gridView = false),
@@ -655,14 +655,11 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         if (savedProductId != null && dialog.mounted) {
           Navigator.pop(dialog, true);
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Produto "${name.text.trim()}" criado com sucesso.',
-                ),
-              ),
+            await showAppAlert(
+              context,
+              'Produto "${name.text.trim()}" criado com sucesso.',
             );
-            context.go('/products/$savedProductId');
+            if (context.mounted) context.go('/products/$savedProductId');
           }
         }
       }
@@ -965,9 +962,7 @@ class _ProductsPageState extends ConsumerState<ProductsPage> {
         if (!context.mounted) return;
         switch (saved) {
           case Success(value: final uri?):
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: LocalizedText('Produtos guardados em $uri')),
-            );
+            await showAppAlert(context, 'Produtos guardados em $uri');
           case Success():
             break;
           case Failure(:final error):

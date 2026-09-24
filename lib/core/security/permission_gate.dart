@@ -114,7 +114,7 @@ class _Denied extends StatelessWidget {
   final VoidCallback onBack;
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const LocalizedText('Acesso restrito')),
+    appBar: AppBar(title: const AppBarTitle('Acesso restrito')),
     body: Center(
       child: Padding(
         padding: const EdgeInsets.all(32),

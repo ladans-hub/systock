@@ -35,7 +35,7 @@ class DashboardData {
   final int chartBucketDays;
 }
 
-enum DashboardPeriod { week, month, quarter, semester, year }
+enum DashboardPeriod { day, week, month, quarter, semester, year }
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -90,6 +90,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     final today = DateTime(now.year, now.month, now.day);
     final to = DateTime(now.year, now.month, now.day + 1).toUtc();
     final from = switch (value) {
+      DashboardPeriod.day => today,
       DashboardPeriod.week => today.subtract(const Duration(days: 6)),
       DashboardPeriod.month => DateTime(now.year, now.month),
       DashboardPeriod.quarter => DateTime(
@@ -116,7 +117,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       appBar: mobile
           ? null
           : AppBar(
-              title: const LocalizedText('Visão geral'),
+              title: const AppBarTitle('Visão geral'),
               actions: [
                 const NotificationBell(),
                 const Padding(
@@ -372,6 +373,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   String _periodLabel(DashboardPeriod value) => switch (value) {
+    DashboardPeriod.day => 'Dia',
     DashboardPeriod.week => 'Semana',
     DashboardPeriod.month => 'Mês',
     DashboardPeriod.quarter => 'Trimestre',

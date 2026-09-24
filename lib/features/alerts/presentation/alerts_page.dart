@@ -19,7 +19,7 @@ class AlertsPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         leading: const AdaptiveBackButton(fallbackPath: '/dashboard'),
-        title: const LocalizedText('Central de alertas'),
+        title: const AppBarTitle('Central de alertas'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

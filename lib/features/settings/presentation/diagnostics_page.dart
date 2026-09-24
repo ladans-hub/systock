@@ -1,3 +1,4 @@
+import 'package:systock/core/widgets/error_dialog.dart';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:drift/drift.dart' show OrderingTerm;
@@ -57,16 +58,14 @@ class _DiagnosticsPageState extends ConsumerState<DiagnosticsPage> {
     if (value.isEmpty || value == 'Não configurado') return;
     await Clipboard.setData(ClipboardData(text: value));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('ID do dispositivo copiado'.localized(context))),
-    );
+    await showAppAlert(context, 'ID do dispositivo copiado');
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       leading: const AdaptiveBackButton(),
-      title: const LocalizedText('Diagnóstico'),
+      title: const AppBarTitle('Diagnóstico'),
     ),
     body: ListView(
       padding: const EdgeInsets.all(20),

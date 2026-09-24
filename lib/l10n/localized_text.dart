@@ -54,6 +54,21 @@ class LocalizedText extends StatelessWidget {
   );
 }
 
+class AppBarTitle extends StatelessWidget {
+  const AppBarTitle(this.data, {super.key, this.localized = true});
+
+  final String data;
+  final bool localized;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    localized ? translateAppText(context, data) : data,
+    maxLines: 1,
+    softWrap: false,
+    overflow: TextOverflow.ellipsis,
+  );
+}
+
 String translateAppText(BuildContext context, String source) {
   if (Localizations.localeOf(context).languageCode != 'en') return source;
   final exact = _english[source];

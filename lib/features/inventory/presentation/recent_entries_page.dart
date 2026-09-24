@@ -87,7 +87,7 @@ class RecentEntriesPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
     appBar: AppBar(
       leading: const AdaptiveBackButton(fallbackPath: '/inventory'),
-      title: const LocalizedText('Entradas recentes'),
+      title: const AppBarTitle('Entradas recentes'),
     ),
     body: ref
         .watch(_recentEntriesProvider)
